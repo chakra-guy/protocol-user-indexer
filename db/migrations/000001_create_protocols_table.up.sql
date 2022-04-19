@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS public.protocols (
+    id BIGSERIAL PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL
+);

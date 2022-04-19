@@ -2,20 +2,19 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"log"
 	"math/big"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-)
-
-var (
-	KEY = "EtoldX34DtXXzfknt1lNdbdGlPlZVU9T"
-	URL = "https://eth-mainnet.alchemyapi.io/v2/" + KEY
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"github.com/tamas-soos/wallet-explorer/config"
+	"github.com/tamas-soos/wallet-explorer/db"
+	"github.com/tamas-soos/wallet-explorer/ethereum_rpc"
 )
 
 type Protocol struct {
@@ -36,28 +35,24 @@ func NewUniswapProtocol() *Protocol {
 }
 
 func (p *Protocol) ProcessNextBlock(client *ethclient.Client, block *types.Block) error {
-
-	fmt.Println("LastProcessedBlock: ", block.Number())
+	log.Debug().Str("block", block.Number().String()).Send()
 
 	for _, tx := range block.Transactions() {
-		if tx.To() == &p.ContractAddress {
-			fmt.Println("uniswap tx: ", tx.Hash().Hex())
+		if tx.To() != nil && tx.To().Hex() == p.ContractAddress.Hex() {
+			log.Debug().Str("uniswap tx", tx.Hash().Hex()).Send()
 
 			chainID, err := client.NetworkID(context.TODO())
 			if err != nil {
-				fmt.Println("client.NetworkID err", err)
 				return err
 			}
 
 			msg, err := tx.AsMessage(types.LatestSignerForChainID(chainID), block.BaseFee())
 			if err != nil {
-				fmt.Println("tx.AsMessage err", err)
 				return err
 			}
 
-			fmt.Println("from: ", msg.From().Hex())
+			log.Debug().Str("from", msg.From().Hex()).Send()
 
-			fmt.Println()
 		}
 	}
 
@@ -65,12 +60,22 @@ func (p *Protocol) ProcessNextBlock(client *ethclient.Client, block *types.Block
 }
 
 func main() {
-	client, err := ethclient.Dial(URL)
+	cfg, err := config.Init()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal().Msgf("cannot load config variables: %v", err)
 	}
 
-	fmt.Println("we have a connection")
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout})
+	zerolog.SetGlobalLevel(zerolog.DebugLevel)
+
+	log.Info().Msg("starting worker...")
+	defer log.Info().Msg("ending worker...")
+
+	dbclient := db.New(&cfg.Database)
+	ethclient := ethereum_rpc.New(&cfg.EthereumRPC)
+
+	_ = dbclient
+	_ = ethclient
 
 	uni := NewUniswapProtocol()
 
@@ -83,25 +88,22 @@ func main() {
 		go func(blockNumber int64) {
 			defer wg.Done()
 
-			block, err := client.BlockByNumber(context.TODO(), big.NewInt(blockNumber))
+			block, err := ethclient.BlockByNumber(context.TODO(), big.NewInt(blockNumber))
 			if err != nil {
-				log.Fatal("client.BlockByNumber err", err)
+				log.Fatal().Msgf("client.BlockByNumber: %v", err)
 			}
 
-			err = uni.ProcessNextBlock(client, block)
+			err = uni.ProcessNextBlock(ethclient, block)
 			if err != nil {
-				log.Fatal("uni.ProcessNextBlock err", err)
+				log.Fatal().Msgf("uni.ProcessNextBlock: %v", err)
 			}
 		}(i)
 	}
 
 	wg.Wait()
 
-	fmt.Println("actaully done")
-
 	elapsed := time.Since(start)
-	log.Printf("Binomial took %s", elapsed)
-
+	log.Debug().Msgf("100 block processing took: %s\n", elapsed)
 }
 
 // number := big.NewInt(14192475)
