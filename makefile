@@ -6,4 +6,7 @@ run:
 migrate:
 	migrate -database "$(DB_URL)" -path db/migrations up
 
-.PHONY: run migrate
+new-migration:
+	migrate create -ext sql -dir db/migrations -seq $(name)
+
+.PHONY: run migrate new-migration

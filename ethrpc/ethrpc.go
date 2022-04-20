@@ -1,4 +1,4 @@
-package ethereum_rpc
+package ethrpc
 
 import (
 	"github.com/ethereum/go-ethereum/ethclient"
