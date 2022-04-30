@@ -8,7 +8,6 @@ import (
 	"github.com/tamas-soos/wallet-explorer/config"
 	"github.com/tamas-soos/wallet-explorer/db"
 	"github.com/tamas-soos/wallet-explorer/ethrpc"
-	"github.com/tamas-soos/wallet-explorer/indexer"
 	"github.com/tamas-soos/wallet-explorer/indexer/protocol"
 	"github.com/tamas-soos/wallet-explorer/store"
 )
@@ -30,11 +29,5 @@ func main() {
 
 	ethclient := ethrpc.New(&cfg.EthereumRPC)
 
-	indexers := []indexer.ProtocolIndexer{
-		protocol.NewUniswap(store, ethclient),
-	}
-
-	for _, i := range indexers {
-		i.Index()
-	}
+	protocol.NewUniswap(store, ethclient).Index()
 }

@@ -3,3 +3,5 @@
 - tests
 
 - prettier for sql
+
+- db reset/setup/seed

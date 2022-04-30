@@ -72,7 +72,7 @@ func (indexer *UniswapIndexer) Index() error {
 					}
 
 					userAddress := msg.From().Hex()
-					err = indexer.store.InsertUserAddress(indexer.id, userAddress)
+					err = indexer.store.SaveProtocolUser(indexer.id, userAddress)
 					if err != nil {
 						log.Fatal().Msgf("indexer.store.InsertUserAddress: %v", err)
 					}

@@ -1,6 +1,6 @@
 CREATE TABLE public.protocol_indexers_users (
-    user_id                         text NOT NULL,
-    protocol_indexer_id        bigserial NOT NULL
+    protocol_indexer_id bigserial NOT NULL,
+    user_id             text NOT NULL
 );
 
 ALTER TABLE

@@ -16,7 +16,7 @@ func New(db *sql.DB) *Store {
 	}
 }
 
-func (store Store) InsertUserAddress(protocol int, address string) error {
+func (store Store) SaveProtocolUser(protocolIndexerID int, address string) error {
 	dbtx, err := store.db.BeginTx(context.TODO(), nil)
 	if err != nil {
 		return fmt.Errorf("cannot insert user address to db: %v", err)
@@ -34,11 +34,11 @@ func (store Store) InsertUserAddress(protocol int, address string) error {
 	}
 
 	statement2 := `
-	INSERT INTO users_protocols (user_id, protocol_id)
+	INSERT INTO protocol_indexers_users (protocol_indexer_id, user_id)
 	VALUES ($1, $2)
-	ON CONFLICT (user_id, protocol_id) DO NOTHING
+	ON CONFLICT (protocol_indexer_id, user_id) DO NOTHING
 	`
-	_, err = dbtx.Exec(statement2, address, protocol)
+	_, err = dbtx.Exec(statement2, protocolIndexerID, address)
 	if err != nil {
 		return fmt.Errorf("cannot insert user address to db: %v", err)
 	}
