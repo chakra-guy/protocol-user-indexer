@@ -1,0 +1,9 @@
+version:
+
+spec:
+  condition:
+    tx:
+      to: <protocol-contract-address>
+
+  user:
+    tx: from

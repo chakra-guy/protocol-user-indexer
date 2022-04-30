@@ -1,0 +1,10 @@
+version:
+
+spec:
+  condition:
+    event:
+      name: Transfer
+
+  user:
+    event:
+      arg: owner
