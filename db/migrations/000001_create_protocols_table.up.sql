@@ -1,4 +1,10 @@
 CREATE TABLE IF NOT EXISTS public.protocols (
-    id BIGSERIAL PRIMARY KEY NOT NULL,
-    name TEXT NOT NULL
+    id      bigserial NOT NULL,
+    name    text NOT NULL
 );
+
+ALTER TABLE
+    ONLY public.protocols
+ADD
+    CONSTRAINT protocols_pkey
+    PRIMARY KEY (id);

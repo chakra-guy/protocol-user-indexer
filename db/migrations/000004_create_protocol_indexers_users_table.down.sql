@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS public.protocol_indexers_users;
