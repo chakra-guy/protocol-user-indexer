@@ -29,5 +29,6 @@ func main() {
 
 	ethclient := ethrpc.New(&cfg.EthereumRPC)
 
-	protocol.NewUniswap(store, ethclient).Index()
+	// protocol.NewUniswap(store, ethclient).Index()
+	protocol.NewYearn(store, ethclient).Index()
 }
