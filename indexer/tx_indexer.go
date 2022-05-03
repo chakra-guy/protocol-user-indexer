@@ -1,4 +1,4 @@
-package protocol
+package indexer
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/tamas-soos/wallet-explorer/store"
 )
 
-type UniswapIndexer struct {
+type TxIndexer struct {
 	// hack
 	id int
 
@@ -28,8 +28,8 @@ type UniswapIndexer struct {
 	contractAddress    common.Address
 }
 
-func NewUniswap(store *store.Store, ethclient *ethclient.Client) *UniswapIndexer {
-	return &UniswapIndexer{
+func NewTxIndexer(store *store.Store, ethclient *ethclient.Client) *TxIndexer {
+	return &TxIndexer{
 		id:                 1,
 		store:              store,
 		ethclient:          ethclient,
@@ -40,7 +40,7 @@ func NewUniswap(store *store.Store, ethclient *ethclient.Client) *UniswapIndexer
 	}
 }
 
-func (indexer *UniswapIndexer) Index() error {
+func (indexer *TxIndexer) Index() error {
 	start := time.Now()
 	var wg sync.WaitGroup
 

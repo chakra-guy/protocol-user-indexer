@@ -8,8 +8,9 @@ import (
 	"github.com/tamas-soos/wallet-explorer/config"
 	"github.com/tamas-soos/wallet-explorer/db"
 	"github.com/tamas-soos/wallet-explorer/ethrpc"
-	"github.com/tamas-soos/wallet-explorer/indexer/protocol"
+	"github.com/tamas-soos/wallet-explorer/indexer"
 	"github.com/tamas-soos/wallet-explorer/store"
+	"github.com/tamas-soos/wallet-explorer/types"
 )
 
 func main() {
@@ -29,6 +30,19 @@ func main() {
 
 	ethclient := ethrpc.New(&cfg.EthereumRPC)
 
-	// protocol.NewUniswap(store, ethclient).Index()
-	protocol.NewYearn(store, ethclient).Index()
+	eventSpec := types.EventIndexerSpec{
+		Condition: struct{ Event struct{ Name string } }{
+			Event: struct{ Name string }{
+				Name: "Approval",
+			},
+		},
+		User: struct{ Event struct{ Arg string } }{
+			Event: struct{ Arg string }{
+				Arg: "owner",
+			},
+		},
+	}
+
+	indexer.NewTxIndexer(store, ethclient).Index()
+	indexer.NewEventIndexer(store, ethclient).Index(eventSpec)
 }
