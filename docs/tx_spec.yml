@@ -1,9 +1,8 @@
-version:
+version: 1
 
-spec:
-  condition:
-    tx:
-      to: <protocol-contract-address>
+condition:
+  tx:
+    to: 0xE592427A0AEce92De3Edee1F18E0157C05861564
 
-  user:
-    tx: from
+user:
+  tx: from

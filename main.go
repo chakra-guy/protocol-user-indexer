@@ -10,7 +10,6 @@ import (
 	"github.com/tamas-soos/wallet-explorer/ethrpc"
 	"github.com/tamas-soos/wallet-explorer/indexer"
 	"github.com/tamas-soos/wallet-explorer/store"
-	"github.com/tamas-soos/wallet-explorer/types"
 )
 
 func main() {
@@ -27,22 +26,10 @@ func main() {
 
 	dbclient := db.New(&cfg.Database)
 	store := store.New(dbclient)
-
 	ethclient := ethrpc.New(&cfg.EthereumRPC)
 
-	eventSpec := types.EventIndexerSpec{
-		Condition: struct{ Event struct{ Name string } }{
-			Event: struct{ Name string }{
-				Name: "Approval",
-			},
-		},
-		User: struct{ Event struct{ Arg string } }{
-			Event: struct{ Arg string }{
-				Arg: "owner",
-			},
-		},
+	err = indexer.NewTxIndexer(store, ethclient).Run()
+	if err != nil {
+		panic(err)
 	}
-
-	indexer.NewTxIndexer(store, ethclient).Index()
-	indexer.NewEventIndexer(store, ethclient).Index(eventSpec)
 }
