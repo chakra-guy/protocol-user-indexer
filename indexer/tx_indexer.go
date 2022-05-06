@@ -6,28 +6,32 @@ import (
 	"math/big"
 	"sync"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/rs/zerolog/log"
 	"github.com/tamas-soos/wallet-explorer/model"
 	"github.com/tamas-soos/wallet-explorer/store"
 )
 
-var BATCH_SIZE uint64 = 10
+var BATCH_SIZE uint64 = 100
 
 type TxIndexer struct {
 	// deps
 	store     *store.Store
 	ethclient *ethclient.Client
+	rpcclient *rpc.Client
 
-	// metadata
-	chainID *big.Int
+	// metadata (could be in config?)
+	networkID *big.Int
 }
 
-func NewTxIndexer(store *store.Store, ethclient *ethclient.Client) *TxIndexer {
+func NewTxIndexer(store *store.Store, ethclient *ethclient.Client, rpcclient *rpc.Client) *TxIndexer {
 	return &TxIndexer{
 		store:     store,
 		ethclient: ethclient,
+		rpcclient: rpcclient,
 	}
 }
 
@@ -37,7 +41,7 @@ func (indexer *TxIndexer) Run() {
 		log.Fatal().Msgf("can't get lastest block: %v", err)
 	}
 
-	indexer.chainID, err = indexer.ethclient.NetworkID(context.TODO())
+	indexer.networkID, err = indexer.ethclient.NetworkID(context.TODO())
 	if err != nil {
 		log.Fatal().Msgf("can't get network id: %v", err)
 	}
@@ -87,22 +91,34 @@ func (indexer *TxIndexer) RunBatchProcessor(txi model.TxIndexer, latestBlock uin
 }
 
 func (indexer *TxIndexer) fetchBlocksByRange(from, to uint64) ([]*types.Block, error) {
-	var blocks []*types.Block
+	fmt.Println("started fetching blocks")
 
+	blocks := make([]*types.Block, BATCH_SIZE)
+	var payload []rpc.BatchElem
+
+	index := 0
 	for i := from; i <= to; i++ {
-		block, err := indexer.ethclient.BlockByNumber(context.TODO(), big.NewInt(int64(i)))
-		if err != nil {
-			return nil, err
-		}
-		blocks = append(blocks, block)
-
-		fmt.Println("block:", block.Hash())
+		payload = append(payload, rpc.BatchElem{
+			Method: "eth_getBlockByNumber",
+			Args:   []interface{}{hexutil.EncodeBig(big.NewInt(int64(i))), true},
+			Result: &blocks[index],
+		})
+		index++
 	}
+
+	err := indexer.rpcclient.BatchCall(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("ended fetching blocks")
 
 	return blocks, nil
 }
 
 func (indexer *TxIndexer) processBlocks(txi model.TxIndexer, blocks []*types.Block) ([]string, error) {
+	fmt.Println("started processing blocks")
+
 	var addresses []string
 
 	for _, block := range blocks {
@@ -116,7 +132,7 @@ func (indexer *TxIndexer) processBlocks(txi model.TxIndexer, blocks []*types.Blo
 				var userAddress string
 				// check user
 				if txi.Spec.User.Tx == "from" {
-					msg, err := tx.AsMessage(types.LatestSignerForChainID(indexer.chainID), block.BaseFee())
+					msg, err := tx.AsMessage(types.LatestSignerForChainID(indexer.networkID), block.BaseFee())
 					if err != nil {
 						return nil, err
 					}
@@ -129,6 +145,8 @@ func (indexer *TxIndexer) processBlocks(txi model.TxIndexer, blocks []*types.Blo
 			}
 		}
 	}
+
+	fmt.Println("ended processing blocks")
 
 	return addresses, nil
 }
