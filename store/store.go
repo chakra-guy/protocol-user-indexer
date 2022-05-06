@@ -35,7 +35,7 @@ func (store Store) GetTxIndexers() ([]model.TxIndexer, error) {
 	for rows.Next() {
 		var t model.TxIndexer
 		var rawSpec []byte
-		err := rows.Scan(&t.ID, &t.LastIndexedBlock, &rawSpec)
+		err := rows.Scan(&t.ID, &t.LastBlockIndexed, &rawSpec)
 		if err != nil {
 			return nil, err
 		}
@@ -79,6 +79,19 @@ func (store Store) SaveProtocolUser(protocolIndexerID int, address string) error
 
 	if err = dbtx.Commit(); err != nil {
 		return fmt.Errorf("cannot insert user address to db: %v", err)
+	}
+
+	return nil
+}
+
+func (store Store) UpdateLastBlockIndexedByID(protocolIndexerID int, lastBlockIndexed uint64) error {
+	statement := `
+	UPDATE protocol_indexers
+	SET last_block_indexed = $2
+	WHERE id = $1;`
+	_, err := store.db.Exec(statement, protocolIndexerID, lastBlockIndexed)
+	if err != nil {
+		return err
 	}
 
 	return nil

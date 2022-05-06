@@ -2,7 +2,7 @@ package model
 
 type TxIndexer struct {
 	ID               int
-	LastIndexedBlock int
+	LastBlockIndexed uint64
 	Spec             TxIndexerSpec
 }
 

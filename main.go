@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"sync"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -28,8 +29,13 @@ func main() {
 	store := store.New(dbclient)
 	ethclient := ethrpc.New(&cfg.EthereumRPC)
 
-	err = indexer.NewTxIndexer(store, ethclient).Run()
-	if err != nil {
-		panic(err)
-	}
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		indexer.NewTxIndexer(store, ethclient).Run()
+	}()
+
+	wg.Wait()
 }
