@@ -16,9 +16,12 @@ import (
 var BATCH_SIZE uint64 = 10
 
 type TxIndexer struct {
+	// deps
 	store     *store.Store
 	ethclient *ethclient.Client
-	chainID   *big.Int
+
+	// metadata
+	chainID *big.Int
 }
 
 func NewTxIndexer(store *store.Store, ethclient *ethclient.Client) *TxIndexer {
@@ -31,17 +34,17 @@ func NewTxIndexer(store *store.Store, ethclient *ethclient.Client) *TxIndexer {
 func (indexer *TxIndexer) Run() {
 	latestBlock, err := indexer.ethclient.BlockNumber(context.TODO())
 	if err != nil {
-		log.Fatal().Msgf("cannot get lastest block: %v", err)
+		log.Fatal().Msgf("can't get lastest block: %v", err)
 	}
 
 	indexer.chainID, err = indexer.ethclient.NetworkID(context.TODO())
 	if err != nil {
-		log.Fatal().Msgf("cannot get network id: %v", err)
+		log.Fatal().Msgf("can't get network id: %v", err)
 	}
 
 	txIndexers, err := indexer.store.GetTxIndexers()
 	if err != nil {
-		log.Fatal().Msgf("cannot get tx indexers: %v", err)
+		log.Fatal().Msgf("can't get tx indexers: %v", err)
 	}
 
 	var wg sync.WaitGroup
@@ -62,55 +65,26 @@ func (indexer *TxIndexer) Run() {
 func (indexer *TxIndexer) RunBatchProcessor(txi model.TxIndexer, latestBlock uint64) {
 	lastBlockIndexed := txi.LastBlockIndexed
 
-	for lastBlockIndexed < latestBlock {
-		blocks, err := indexer.fetchBlocksByRange(lastBlockIndexed+1, lastBlockIndexed+BATCH_SIZE)
+	for lastBlockIndexed <= latestBlock {
+		to, from := lastBlockIndexed+1, lastBlockIndexed+BATCH_SIZE
+		blocks, err := indexer.fetchBlocksByRange(to, from)
 		if err != nil {
-			log.Fatal().Msgf("cannot get block: %v", err)
+			log.Fatal().Msgf("can't get block: %v", err)
 		}
 
 		addresses, err := indexer.processBlocks(txi, blocks)
 		if err != nil {
-			log.Fatal().Msgf("cannot process blocks: %v", err)
+			log.Fatal().Msgf("can't process blocks: %v", err)
 		}
 
-		err = indexer.storeResults(txi, addresses, lastBlockIndexed+BATCH_SIZE)
+		err = indexer.storeResults(txi, addresses, from)
 		if err != nil {
-			log.Fatal().Msgf("cannot store indexing results: %v", err)
+			log.Fatal().Msgf("can't store indexing results: %v", err)
 		}
 
-		lastBlockIndexed += BATCH_SIZE
+		lastBlockIndexed = from
 	}
 }
-
-// func (indexer *TxIndexer) fetchBlocksByRange(from, to uint64) ([]*types.Block, error) {
-// 	var blocks []*types.Block
-
-// 	results := make(chan *types.Block)
-// 	failure := make(chan struct{})
-
-// 	for i := from; i <= to; i++ {
-// 		i := i
-// 		go func() {
-// 			block, err := indexer.ethclient.BlockByNumber(context.TODO(), big.NewInt(int64(i)))
-// 			if err != nil {
-// 				failure <- struct{}{}
-// 			}
-// 			results <- block
-// 			fmt.Println("fetchBlocksByRange -> produce", block.Hash())
-// 		}()
-// 	}
-
-// 	// TODO failure
-// 	// TODO timeout
-
-// 	for i := from; i <= to; i++ {
-// 		block := <-results
-// 		fmt.Println("fetchBlocksByRange -> consume", block.Hash())
-// 		blocks = append(blocks, block)
-// 	}
-
-// 	return blocks, nil
-// }
 
 func (indexer *TxIndexer) fetchBlocksByRange(from, to uint64) ([]*types.Block, error) {
 	var blocks []*types.Block
@@ -163,7 +137,7 @@ func (indexer *TxIndexer) storeResults(txi model.TxIndexer, addresses []string, 
 	fmt.Println("started storing results")
 
 	for _, address := range addresses {
-		err := indexer.store.SaveProtocolUser(txi.ID, address)
+		err := indexer.store.PutProtocolUser(txi.ID, address)
 		if err != nil {
 			return err
 		}

@@ -50,10 +50,10 @@ func (store Store) GetTxIndexers() ([]model.TxIndexer, error) {
 	return tt, nil
 }
 
-func (store Store) SaveProtocolUser(protocolIndexerID int, address string) error {
+func (store Store) PutProtocolUser(protocolIndexerID int, address string) error {
 	dbtx, err := store.db.BeginTx(context.TODO(), nil)
 	if err != nil {
-		return fmt.Errorf("cannot insert user address to db: %v", err)
+		return fmt.Errorf("can't insert protocol user into db: %v", err)
 	}
 	defer dbtx.Rollback()
 
@@ -64,7 +64,7 @@ func (store Store) SaveProtocolUser(protocolIndexerID int, address string) error
 	`
 	_, err = dbtx.Exec(statement, address)
 	if err != nil {
-		return fmt.Errorf("cannot insert user address to db: %v", err)
+		return fmt.Errorf("can't insert protocol user into db: %v", err)
 	}
 
 	statement2 := `
@@ -74,11 +74,11 @@ func (store Store) SaveProtocolUser(protocolIndexerID int, address string) error
 	`
 	_, err = dbtx.Exec(statement2, protocolIndexerID, address)
 	if err != nil {
-		return fmt.Errorf("cannot insert user address to db: %v", err)
+		return fmt.Errorf("can't insert protocol user into db: %v", err)
 	}
 
 	if err = dbtx.Commit(); err != nil {
-		return fmt.Errorf("cannot insert user address to db: %v", err)
+		return fmt.Errorf("can't insert protocol user into db: %v", err)
 	}
 
 	return nil
@@ -88,7 +88,8 @@ func (store Store) UpdateLastBlockIndexedByID(protocolIndexerID int, lastBlockIn
 	statement := `
 	UPDATE protocol_indexers
 	SET last_block_indexed = $2
-	WHERE id = $1;`
+	WHERE id = $1
+	`
 	_, err := store.db.Exec(statement, protocolIndexerID, lastBlockIndexed)
 	if err != nil {
 		return err

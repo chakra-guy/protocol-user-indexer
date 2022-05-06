@@ -16,7 +16,7 @@ import (
 func main() {
 	cfg, err := config.Init()
 	if err != nil {
-		log.Fatal().Msgf("cannot load config variables: %v", err)
+		log.Fatal().Msgf("can't load config variables: %v", err)
 	}
 
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout})
