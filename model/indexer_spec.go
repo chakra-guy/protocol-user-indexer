@@ -16,3 +16,26 @@ type TxIndexerSpec struct {
 		Tx string
 	}
 }
+
+type EventIndexer struct {
+	ID               int
+	LastBlockIndexed uint64
+	Spec             EventIndexerSpec
+}
+
+type EventIndexerSpec struct {
+	Condition struct {
+		Contract struct {
+			Address string
+			ABI     string
+		}
+		Event struct {
+			Name string
+		}
+	}
+	User struct {
+		Event struct {
+			Arg string
+		}
+	}
+}

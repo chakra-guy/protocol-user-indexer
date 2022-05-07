@@ -1,109 +1,165 @@
 package indexer
 
-// import (
-// 	"context"
-// 	"encoding/json"
-// 	"fmt"
-// 	"math/big"
-// 	"strings"
-// 	"time"
+import (
+	"context"
+	"fmt"
+	"math/big"
+	"strings"
+	"sync"
 
-// 	"github.com/ethereum/go-ethereum"
-// 	"github.com/ethereum/go-ethereum/accounts/abi"
-// 	"github.com/ethereum/go-ethereum/common"
-// 	"github.com/ethereum/go-ethereum/ethclient"
-// 	"github.com/rs/zerolog/log"
-// 	"github.com/tamas-soos/wallet-explorer/store"
-// 	"github.com/tamas-soos/wallet-explorer/types"
-// )
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/rs/zerolog/log"
+	"github.com/tamas-soos/wallet-explorer/model"
+	"github.com/tamas-soos/wallet-explorer/store"
+)
 
-// var ABI = `[{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"owner","type":"address"},{"indexed":true,"internalType":"address","name":"spender","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"Approval","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"delegator","type":"address"},{"indexed":true,"internalType":"address","name":"fromDelegate","type":"address"},{"indexed":true,"internalType":"address","name":"toDelegate","type":"address"}],"name":"DelegateChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"delegate","type":"address"},{"indexed":false,"internalType":"uint256","name":"previousBalance","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"newBalance","type":"uint256"}],"name":"DelegateVotesChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"Transfer","type":"event"},{"inputs":[],"name":"CRV","outputs":[{"internalType":"contract IERC20","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"DELEGATION_TYPEHASH","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"DOMAINSEPARATOR","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"DOMAIN_TYPEHASH","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"LOCK","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"PERMIT_TYPEHASH","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"acceptGovernance","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"address","name":"spender","type":"address"}],"name":"allowance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"bal","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"},{"internalType":"uint32","name":"","type":"uint32"}],"name":"checkpoints","outputs":[{"internalType":"uint32","name":"fromBlock","type":"uint32"},{"internalType":"uint256","name":"votes","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"claim","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"recipient","type":"address"}],"name":"claimFor","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"claimable","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"delegatee","type":"address"}],"name":"delegate","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"delegatee","type":"address"},{"internalType":"uint256","name":"nonce","type":"uint256"},{"internalType":"uint256","name":"expiry","type":"uint256"},{"internalType":"uint8","name":"v","type":"uint8"},{"internalType":"bytes32","name":"r","type":"bytes32"},{"internalType":"bytes32","name":"s","type":"bytes32"}],"name":"delegateBySig","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"delegates","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"_amount","type":"uint256"}],"name":"deposit","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"depositAll","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"feeDistribution","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"getCurrentVotes","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"uint256","name":"blockNumber","type":"uint256"}],"name":"getPriorVotes","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"governance","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"index","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"name","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"nonces","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"numCheckpoints","outputs":[{"internalType":"uint32","name":"","type":"uint32"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pendingGovernance","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"deadline","type":"uint256"},{"internalType":"uint8","name":"v","type":"uint8"},{"internalType":"bytes32","name":"r","type":"bytes32"},{"internalType":"bytes32","name":"s","type":"bytes32"}],"name":"permit","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"proxy","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"rewards","outputs":[{"internalType":"contract IERC20","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"_feeDistribution","type":"address"}],"name":"setFeeDistribution","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"_governance","type":"address"}],"name":"setGovernance","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"_proxy","type":"address"}],"name":"setProxy","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"supplyIndex","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"symbol","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"totalSupply","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"dst","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transfer","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"src","type":"address"},{"internalType":"address","name":"dst","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transferFrom","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"update","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"recipient","type":"address"}],"name":"updateFor","outputs":[],"stateMutability":"nonpayable","type":"function"}]`
+type EventIndexer struct {
+	// deps
+	store     *store.Store
+	ethclient *ethclient.Client
+	rpcclient *rpc.Client
+}
 
-// type EventIndexer struct {
-// 	// deps
-// 	store     *store.Store
-// 	ethclient *ethclient.Client
+func NewEventIndexer(store *store.Store, ethclient *ethclient.Client, rpcclient *rpc.Client) *EventIndexer {
+	return &EventIndexer{
+		store:     store,
+		ethclient: ethclient,
+		rpcclient: rpcclient,
+	}
+}
 
-// 	// protocol specific config
-// 	id                 int
-// 	name               string
-// 	deployBlock        *big.Int
-// 	lastProcessedBlock *big.Int
-// 	contractAddress    common.Address
-// }
+func (indexer *EventIndexer) Run() {
+	latestBlock, err := indexer.ethclient.BlockNumber(context.TODO())
+	if err != nil {
+		log.Fatal().Msgf("can't get lastest block: %v", err)
+	}
 
-// func NewEventIndexer(store *store.Store, ethclient *ethclient.Client) *EventIndexer {
-// 	return &EventIndexer{
-// 		store:              store,
-// 		ethclient:          ethclient,
-// 		id:                 2,
-// 		name:               "Yearn",
-// 		deployBlock:        big.NewInt(11196772),
-// 		lastProcessedBlock: big.NewInt(14646109),
-// 		contractAddress:    common.HexToAddress("0xc5bDdf9843308380375a611c18B50Fb9341f502A"),
-// 	}
-// }
+	eventIndexers, err := indexer.store.GetEventIndexers()
+	if err != nil {
+		log.Fatal().Msgf("can't get event indexers: %v", err)
+	}
 
-// func (indexer *EventIndexer) Index(spec types.EventIndexerSpec) error {
-// 	start := time.Now()
+	// FIXME
+	latestBlock = eventIndexers[0].LastBlockIndexed + (BATCH_SIZE)
 
-// 	query := ethereum.FilterQuery{
-// 		FromBlock: indexer.lastProcessedBlock,
-// 		ToBlock:   indexer.lastProcessedBlock,
-// 		Addresses: []common.Address{indexer.contractAddress},
-// 	}
+	var wg sync.WaitGroup
+	for _, ei := range eventIndexers {
+		ei := ei
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			indexer.RunBatchProcessor(ei, latestBlock)
+		}()
+	}
 
-// 	logs, err := indexer.ethclient.FilterLogs(context.Background(), query)
-// 	if err != nil {
-// 		return err
-// 	}
+	wg.Wait()
+}
 
-// 	contractABI, err := abi.JSON(strings.NewReader(ABI))
-// 	if err != nil {
-// 		return err
-// 	}
+func (indexer *EventIndexer) RunBatchProcessor(ei model.EventIndexer, latestBlock uint64) {
+	contractABI, err := abi.JSON(strings.NewReader(ei.Spec.Condition.Contract.ABI))
+	if err != nil {
+		log.Warn().Int("protocol indexer id", ei.ID).Msgf("can't run indexer: can't parse contract abi: %v", err)
+		return
+	}
 
-// 	for _, log := range logs {
-// 		if log.Topics[0] == contractABI.Events[spec.Condition.Event.Name].ID {
-// 			event := make(map[string]interface{})
+	lastBlockIndexed := ei.LastBlockIndexed
 
-// 			err := contractABI.UnpackIntoMap(event, spec.Condition.Event.Name, log.Data)
-// 			if err != nil {
-// 				return err
-// 			}
+	for lastBlockIndexed <= latestBlock {
+		from, to := lastBlockIndexed+1, lastBlockIndexed+BATCH_SIZE
 
-// 			var i = 1 // topic_name_0 is the event signature so we start from 1
-// 			for _, input := range contractABI.Events[spec.Condition.Event.Name].Inputs {
-// 				if input.Indexed {
-// 					if input.Type.String() == "address" {
-// 						event[input.Name] = common.HexToAddress(log.Topics[i].Hex())
-// 					} else {
-// 						event[input.Name] = log.Topics[i]
-// 					}
-// 					i += 1
-// 				}
-// 			}
+		fmt.Printf("from, to: %d - %d\n\n", from, to)
 
-// 			eventjson, _ := json.Marshal(event)
-// 			eventSimple := make(map[string]interface{})
-// 			err = json.Unmarshal(eventjson, &eventSimple)
-// 			if err != nil {
-// 				return err
-// 			}
+		logs, err := indexer.fetchLogsByRange(ei, from, to)
+		if err != nil {
+			log.Fatal().Msgf("can't get logs: %v", err)
+		}
 
-// 			fmt.Printf("\n 🟢🟢 EVENT: %s\n\n", eventjson)
-// 			fmt.Printf("\n 🟡🟡 USER: %+v\n\n", event[spec.User.Event.Arg])
+		fmt.Printf("logs: %d\n\n", len(logs))
+		fmt.Printf("logs: %+v\n\n", logs)
 
-// 			user, ok := eventSimple[spec.User.Event.Arg].(string)
-// 			if ok {
-// 				fmt.Printf("\n 🔵🔵 USER: %s\n\n", user)
-// 				indexer.store.SaveProtocolUser(indexer.id, user)
-// 			}
-// 		}
-// 	}
+		addresses, err := indexer.processLogs(ei, contractABI, logs)
+		if err != nil {
+			log.Fatal().Msgf("can't process blocks: %v", err)
+		}
 
-// 	elapsed := time.Since(start)
-// 	log.Debug().Msgf("100 block processing took: %s\n", elapsed)
+		fmt.Printf("addresses: %+v\n\n", addresses)
 
-// 	return nil
-// }
+		err = indexer.storeResults(ei, addresses, to)
+		if err != nil {
+			log.Fatal().Msgf("can't store indexing results: %v", err)
+		}
+
+		lastBlockIndexed = to
+	}
+}
+
+func (indexer *EventIndexer) fetchLogsByRange(ei model.EventIndexer, from, to uint64) ([]types.Log, error) {
+	query := ethereum.FilterQuery{
+		FromBlock: big.NewInt(int64(from)),
+		ToBlock:   big.NewInt(int64(to)),
+		Addresses: []common.Address{common.HexToAddress(ei.Spec.Condition.Contract.Address)},
+	}
+
+	logs, err := indexer.ethclient.FilterLogs(context.Background(), query)
+	if err != nil {
+		return nil, err
+	}
+
+	return logs, nil
+}
+
+func (indexer *EventIndexer) processLogs(ei model.EventIndexer, contractABI abi.ABI, logs []types.Log) ([]string, error) {
+	var addresses []string
+
+	for _, log := range logs {
+		if log.Topics[0] == contractABI.Events[ei.Spec.Condition.Event.Name].ID {
+			event := make(map[string]interface{})
+
+			err := contractABI.UnpackIntoMap(event, ei.Spec.Condition.Event.Name, log.Data)
+			if err != nil {
+				return nil, err
+			}
+
+			var i = 1 // topic_name_0 is the event signature so we start from 1
+			for _, input := range contractABI.Events[ei.Spec.Condition.Event.Name].Inputs {
+				if input.Indexed {
+					if input.Type.String() == "address" {
+						event[input.Name] = common.HexToAddress(log.Topics[i].Hex()).String()
+					} else {
+						// TODO handle more event ar types
+						event[input.Name] = log.Topics[i]
+					}
+					i += 1
+				}
+			}
+
+			address, ok := event[ei.Spec.User.Event.Arg].(string)
+			if ok && address != "" {
+				addresses = append(addresses, address)
+			}
+		}
+	}
+
+	return addresses, nil
+}
+
+func (indexer *EventIndexer) storeResults(ei model.EventIndexer, addresses []string, lastBlockIndexed uint64) error {
+	for _, address := range addresses {
+		err := indexer.store.PutProtocolUser(ei.ID, address)
+		if err != nil {
+			return err
+		}
+	}
+
+	err := indexer.store.UpdateLastBlockIndexedByID(ei.ID, lastBlockIndexed)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

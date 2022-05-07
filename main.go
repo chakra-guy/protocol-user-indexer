@@ -37,10 +37,16 @@ func main() {
 
 	var wg sync.WaitGroup
 
+	// wg.Add(1)
+	// go func() {
+	// 	defer wg.Done()
+	// 	indexer.NewTxIndexer(store, ethclient, rpcclient).Run()
+	// }()
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		indexer.NewTxIndexer(store, ethclient, rpcclient).Run()
+		indexer.NewEventIndexer(store, ethclient, rpcclient).Run()
 	}()
 
 	wg.Wait()

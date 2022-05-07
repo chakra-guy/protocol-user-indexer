@@ -4,6 +4,9 @@
 
 # later
 
+- add protocol indexer id to logs
+- db seeding
+- makefile should not contain secret, ye?
 - context drilling
 - proper db design
 - tests

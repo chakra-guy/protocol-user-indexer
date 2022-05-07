@@ -1,9 +1,12 @@
-version:
+version: 1
 
 spec:
   condition:
+    contract:
+      address: ...
+      abi: ...
     event:
-      name: Transfer
+      name: Approval
 
   user:
     event:

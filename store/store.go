@@ -50,6 +50,37 @@ func (store Store) GetTxIndexers() ([]model.TxIndexer, error) {
 	return tt, nil
 }
 
+func (store Store) GetEventIndexers() ([]model.EventIndexer, error) {
+	q := `
+	SELECT id, last_block_indexed, spec FROM protocol_indexers
+	WHERE type = 'event'
+	`
+	rows, err := store.db.Query(q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ee := make([]model.EventIndexer, 0)
+
+	for rows.Next() {
+		var e model.EventIndexer
+		var rawSpec []byte
+		err := rows.Scan(&e.ID, &e.LastBlockIndexed, &rawSpec)
+		if err != nil {
+			return nil, err
+		}
+		err = json.Unmarshal(rawSpec, &e.Spec)
+		if err != nil {
+			return nil, err
+		}
+
+		ee = append(ee, e)
+	}
+
+	return ee, nil
+}
+
 func (store Store) PutProtocolUser(protocolIndexerID int, address string) error {
 	dbtx, err := store.db.BeginTx(context.TODO(), nil)
 	if err != nil {

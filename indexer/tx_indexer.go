@@ -2,10 +2,10 @@ package indexer
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"sync"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -13,8 +13,6 @@ import (
 	"github.com/tamas-soos/wallet-explorer/model"
 	"github.com/tamas-soos/wallet-explorer/store"
 )
-
-var BATCH_SIZE uint64 = 10
 
 type TxIndexer struct {
 	// deps
@@ -50,6 +48,9 @@ func (indexer *TxIndexer) Run() {
 		log.Fatal().Msgf("can't get tx indexers: %v", err)
 	}
 
+	// FIXME
+	latestBlock = txIndexers[0].LastBlockIndexed + BATCH_SIZE
+
 	var wg sync.WaitGroup
 	for _, txi := range txIndexers {
 		txi := txi
@@ -61,8 +62,6 @@ func (indexer *TxIndexer) Run() {
 	}
 
 	wg.Wait()
-
-	_ = latestBlock
 }
 
 func (indexer *TxIndexer) RunBatchProcessor(txi model.TxIndexer, latestBlock uint64) {
@@ -124,46 +123,42 @@ func (indexer *TxIndexer) blockFetcherPool(startBlock uint64) <-chan []*types.Bl
 	return blocksCH
 }
 
-// func (indexer *TxIndexer) fetchBlocksByRange(from, to uint64) ([]*types.Block, error) {
-// 	var payload []rpc.BatchElem
-// 	blocks := make([]interface{}, BATCH_SIZE)
-// 	index := 0
+func (indexer *TxIndexer) fetchBlocksByRange(from, to uint64) ([]*types.Block, error) {
+	var payload []rpc.BatchElem
+	blocks := make([]interface{}, BATCH_SIZE)
+	index := 0
 
-// 	for i := from; i <= to; i++ {
-// 		payload = append(payload, rpc.BatchElem{
-// 			Method: "eth_getBlockByNumber",
-// 			Args:   []interface{}{hexutil.EncodeBig(big.NewInt(int64(i))), true},
-// 			Result: &blocks[index],
-// 		})
-// 		index++
-// 	}
+	for i := from; i <= to; i++ {
+		payload = append(payload, rpc.BatchElem{
+			Method: "eth_getBlockByNumber",
+			Args:   []interface{}{hexutil.EncodeBig(big.NewInt(int64(i))), true},
+			Result: &blocks[index],
+		})
+		index++
+	}
 
-// 	// var batchelements []map[string]interface{}
-// 	// for i, p := range payload {
-// 	// 	batchelements = append(batchelements, map[string]interface{}{
-// 	// 		"jsonrpc": "2.0",
-// 	// 		"id":      i,
-// 	// 		"method":  p.Method,
-// 	// 		"params":  p.Args,
-// 	// 	})
-// 	// }
+	// var batchelements []map[string]interface{}
+	// for i, p := range payload {
+	// 	batchelements = append(batchelements, map[string]interface{}{
+	// 		"jsonrpc": "2.0",
+	// 		"id":      i,
+	// 		"method":  p.Method,
+	// 		"params":  p.Args,
+	// 	})
+	// }
+	// stuff, _ := json.Marshal(batchelements)
+	// fmt.Println(string(stuff))
 
-// 	// stuff, _ := json.Marshal(batchelements)
-// 	// fmt.Println(string(stuff))
+	err := indexer.rpcclient.BatchCall(payload)
+	if err != nil {
+		return nil, err
+	}
 
-// 	err := indexer.rpcclient.BatchCall(payload)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return nil, nil
-// }
+	return nil, nil
+}
 
 func (indexer *TxIndexer) processBlocks(txi model.TxIndexer, blocks []*types.Block) ([]string, error) {
 	var addresses []string
-
-	// fmt.Printf("txi %+v\n", txi)
-	// fmt.Printf("block %+v\n", blocks[0])
 
 	for _, block := range blocks {
 		for _, tx := range block.Transactions() {
@@ -182,7 +177,6 @@ func (indexer *TxIndexer) processBlocks(txi model.TxIndexer, blocks []*types.Blo
 					}
 
 					userAddress = msg.From().Hex()
-					fmt.Println("userAddress", userAddress)
 					if userAddress != "" {
 						addresses = append(addresses, userAddress)
 					}
