@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -15,7 +14,7 @@ import (
 	"github.com/tamas-soos/wallet-explorer/store"
 )
 
-var BATCH_SIZE uint64 = 100
+var BATCH_SIZE uint64 = 10
 
 type TxIndexer struct {
 	// deps
@@ -57,7 +56,7 @@ func (indexer *TxIndexer) Run() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			indexer.RunBatchProcessor(txi, txi.LastBlockIndexed+(BATCH_SIZE*2))
+			indexer.RunBatchProcessor(txi, latestBlock)
 		}()
 	}
 
@@ -69,57 +68,102 @@ func (indexer *TxIndexer) Run() {
 func (indexer *TxIndexer) RunBatchProcessor(txi model.TxIndexer, latestBlock uint64) {
 	lastBlockIndexed := txi.LastBlockIndexed
 
-	for lastBlockIndexed <= latestBlock {
-		to, from := lastBlockIndexed+1, lastBlockIndexed+BATCH_SIZE
-		blocks, err := indexer.fetchBlocksByRange(to, from)
-		if err != nil {
-			log.Fatal().Msgf("can't get block: %v", err)
-		}
+	blocksCH := indexer.blockFetcherPool(lastBlockIndexed)
 
+	for lastBlockIndexed <= latestBlock {
+		to := lastBlockIndexed + BATCH_SIZE
+		blocks := <-blocksCH
+
+		// from, to := lastBlockIndexed+1, lastBlockIndexed+BATCH_SIZE
+		// blocks, err := indexer.fetchBlocksByRange(from, to)
+		// if err != nil {
+		// 	log.Fatal().Msgf("can't get block: %v", err)
+		// }
+
+		log.Debug().Msg("RunBatchProcessor -> processing blocks")
 		addresses, err := indexer.processBlocks(txi, blocks)
 		if err != nil {
 			log.Fatal().Msgf("can't process blocks: %v", err)
 		}
 
-		err = indexer.storeResults(txi, addresses, from)
+		log.Debug().Msgf("RunBatchProcessor -> storing results, addresses.len: %v, blocknumber: %v", len(addresses), to)
+		err = indexer.storeResults(txi, addresses, to)
 		if err != nil {
 			log.Fatal().Msgf("can't store indexing results: %v", err)
 		}
 
-		lastBlockIndexed = from
+		lastBlockIndexed = to
 	}
 }
 
-func (indexer *TxIndexer) fetchBlocksByRange(from, to uint64) ([]*types.Block, error) {
-	fmt.Println("started fetching blocks")
+func (indexer *TxIndexer) blockFetcherPool(startBlock uint64) <-chan []*types.Block {
+	POOL_SIZE := 5
+	lastBlockIndexed := startBlock
+	blocksCH := make(chan []*types.Block, 5)
+	pool := make(chan struct{}, POOL_SIZE)
 
-	blocks := make([]*types.Block, BATCH_SIZE)
-	var payload []rpc.BatchElem
+	for i := 0; i < POOL_SIZE; i++ {
+		go func() {
+			for {
+				pool <- struct{}{}
 
-	index := 0
-	for i := from; i <= to; i++ {
-		payload = append(payload, rpc.BatchElem{
-			Method: "eth_getBlockByNumber",
-			Args:   []interface{}{hexutil.EncodeBig(big.NewInt(int64(i))), true},
-			Result: &blocks[index],
-		})
-		index++
+				log.Debug().Msg("blockFetcherPool -> producing blocks")
+				to, from := lastBlockIndexed+1, lastBlockIndexed+BATCH_SIZE
+				block, err := indexer.fetchBlocksByRange(to, from)
+				if err != nil {
+					log.Fatal().Msgf("can't get block: %v", err)
+				}
+				lastBlockIndexed = from
+				blocksCH <- block
+
+				<-pool
+			}
+		}()
 	}
 
-	err := indexer.rpcclient.BatchCall(payload)
-	if err != nil {
-		return nil, err
-	}
-
-	fmt.Println("ended fetching blocks")
-
-	return blocks, nil
+	return blocksCH
 }
+
+// func (indexer *TxIndexer) fetchBlocksByRange(from, to uint64) ([]*types.Block, error) {
+// 	var payload []rpc.BatchElem
+// 	blocks := make([]interface{}, BATCH_SIZE)
+// 	index := 0
+
+// 	for i := from; i <= to; i++ {
+// 		payload = append(payload, rpc.BatchElem{
+// 			Method: "eth_getBlockByNumber",
+// 			Args:   []interface{}{hexutil.EncodeBig(big.NewInt(int64(i))), true},
+// 			Result: &blocks[index],
+// 		})
+// 		index++
+// 	}
+
+// 	// var batchelements []map[string]interface{}
+// 	// for i, p := range payload {
+// 	// 	batchelements = append(batchelements, map[string]interface{}{
+// 	// 		"jsonrpc": "2.0",
+// 	// 		"id":      i,
+// 	// 		"method":  p.Method,
+// 	// 		"params":  p.Args,
+// 	// 	})
+// 	// }
+
+// 	// stuff, _ := json.Marshal(batchelements)
+// 	// fmt.Println(string(stuff))
+
+// 	err := indexer.rpcclient.BatchCall(payload)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	return nil, nil
+// }
 
 func (indexer *TxIndexer) processBlocks(txi model.TxIndexer, blocks []*types.Block) ([]string, error) {
-	fmt.Println("started processing blocks")
-
 	var addresses []string
+
+	// fmt.Printf("txi %+v\n", txi)
+	// fmt.Printf("block %+v\n", blocks[0])
 
 	for _, block := range blocks {
 		for _, tx := range block.Transactions() {
@@ -138,6 +182,7 @@ func (indexer *TxIndexer) processBlocks(txi model.TxIndexer, blocks []*types.Blo
 					}
 
 					userAddress = msg.From().Hex()
+					fmt.Println("userAddress", userAddress)
 					if userAddress != "" {
 						addresses = append(addresses, userAddress)
 					}
@@ -146,14 +191,10 @@ func (indexer *TxIndexer) processBlocks(txi model.TxIndexer, blocks []*types.Blo
 		}
 	}
 
-	fmt.Println("ended processing blocks")
-
 	return addresses, nil
 }
 
 func (indexer *TxIndexer) storeResults(txi model.TxIndexer, addresses []string, lastBlockIndexed uint64) error {
-	fmt.Println("started storing results")
-
 	for _, address := range addresses {
 		err := indexer.store.PutProtocolUser(txi.ID, address)
 		if err != nil {
@@ -165,8 +206,6 @@ func (indexer *TxIndexer) storeResults(txi model.TxIndexer, addresses []string, 
 	if err != nil {
 		return err
 	}
-
-	fmt.Println("ended storing results")
 
 	return nil
 }

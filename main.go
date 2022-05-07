@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/rs/zerolog"
@@ -31,6 +33,8 @@ func main() {
 	ethclient := eth.New(&cfg.EthereumRPC)
 	rpcclient, _ := rpc.Dial(cfg.EthereumRPC.URL + cfg.EthereumRPC.APIKey)
 
+	start := time.Now()
+
 	var wg sync.WaitGroup
 
 	wg.Add(1)
@@ -40,4 +44,8 @@ func main() {
 	}()
 
 	wg.Wait()
+
+	took := time.Now().Sub(start)
+
+	fmt.Println("took:", took.Seconds())
 }
