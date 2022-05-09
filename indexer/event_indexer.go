@@ -2,7 +2,6 @@ package indexer
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"strings"
 	"sync"
@@ -45,7 +44,7 @@ func (indexer *EventIndexer) Run() {
 	}
 
 	// FIXME
-	latestBlock = eventIndexers[0].LastBlockIndexed + (BATCH_SIZE)
+	// latestBlock = eventIndexers[0].LastBlockIndexed + (BATCH_SIZE)
 
 	var wg sync.WaitGroup
 	for _, ei := range eventIndexers {
@@ -63,31 +62,25 @@ func (indexer *EventIndexer) Run() {
 func (indexer *EventIndexer) RunBatchProcessor(ei model.EventIndexer, latestBlock uint64) {
 	contractABI, err := abi.JSON(strings.NewReader(ei.Spec.Condition.Contract.ABI))
 	if err != nil {
-		log.Warn().Int("protocol indexer id", ei.ID).Msgf("can't run indexer: can't parse contract abi: %v", err)
+		log.Warn().Int("protocol-id", ei.ID).Msgf("can't run indexer: can't parse contract abi: %v", err)
 		return
 	}
 
 	lastBlockIndexed := ei.LastBlockIndexed
 
+	// FIXME fix bug when indexer catches up and uses the wrong last indexed block number -> this can lead to skipping blocks
 	for lastBlockIndexed <= latestBlock {
 		from, to := lastBlockIndexed+1, lastBlockIndexed+BATCH_SIZE
-
-		fmt.Printf("from, to: %d - %d\n\n", from, to)
 
 		logs, err := indexer.fetchLogsByRange(ei, from, to)
 		if err != nil {
 			log.Fatal().Msgf("can't get logs: %v", err)
 		}
 
-		fmt.Printf("logs: %d\n\n", len(logs))
-		fmt.Printf("logs: %+v\n\n", logs)
-
 		addresses, err := indexer.processLogs(ei, contractABI, logs)
 		if err != nil {
-			log.Fatal().Msgf("can't process blocks: %v", err)
+			log.Fatal().Msgf("can't process logs: %v", err)
 		}
-
-		fmt.Printf("addresses: %+v\n\n", addresses)
 
 		err = indexer.storeResults(ei, addresses, to)
 		if err != nil {
@@ -95,7 +88,11 @@ func (indexer *EventIndexer) RunBatchProcessor(ei model.EventIndexer, latestBloc
 		}
 
 		lastBlockIndexed = to
+
+		log.Debug().Str("type", "event").Int("protocol-id", ei.ID).Int("num-of-addresses", len(addresses)).Uint64("latest-block-indexed", lastBlockIndexed).Send()
 	}
+
+	log.Debug().Str("type", "event").Int("protocol-id", ei.ID).Msg("indexer caught up")
 }
 
 func (indexer *EventIndexer) fetchLogsByRange(ei model.EventIndexer, from, to uint64) ([]types.Log, error) {

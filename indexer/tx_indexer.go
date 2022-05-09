@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"context"
+	"encoding/json"
 	"math/big"
 	"sync"
 
@@ -49,7 +50,7 @@ func (indexer *TxIndexer) Run() {
 	}
 
 	// FIXME
-	latestBlock = txIndexers[0].LastBlockIndexed + BATCH_SIZE
+	// latestBlock = txIndexers[0].LastBlockIndexed + BATCH_SIZE
 
 	var wg sync.WaitGroup
 	for _, txi := range txIndexers {
@@ -67,32 +68,36 @@ func (indexer *TxIndexer) Run() {
 func (indexer *TxIndexer) RunBatchProcessor(txi model.TxIndexer, latestBlock uint64) {
 	lastBlockIndexed := txi.LastBlockIndexed
 
-	blocksCH := indexer.blockFetcherPool(lastBlockIndexed)
+	// blocksCH := indexer.blockFetcherPool(lastBlockIndexed)
 
+	// FIXME fix bug when indexer catches up and uses the wrong last indexed block number -> this can lead to skipping blocks
 	for lastBlockIndexed <= latestBlock {
-		to := lastBlockIndexed + BATCH_SIZE
-		blocks := <-blocksCH
+		// to := lastBlockIndexed + BATCH_SIZE
+		// blocks := <-blocksCH
 
-		// from, to := lastBlockIndexed+1, lastBlockIndexed+BATCH_SIZE
-		// blocks, err := indexer.fetchBlocksByRange(from, to)
-		// if err != nil {
-		// 	log.Fatal().Msgf("can't get block: %v", err)
-		// }
+		from, to := lastBlockIndexed+1, lastBlockIndexed+BATCH_SIZE
 
-		log.Debug().Msg("RunBatchProcessor -> processing blocks")
+		blocks, err := indexer.fetchBlocksByRange(from, to)
+		if err != nil {
+			log.Fatal().Msgf("can't get block: %v", err)
+		}
+
 		addresses, err := indexer.processBlocks(txi, blocks)
 		if err != nil {
 			log.Fatal().Msgf("can't process blocks: %v", err)
 		}
 
-		log.Debug().Msgf("RunBatchProcessor -> storing results, addresses.len: %v, blocknumber: %v", len(addresses), to)
 		err = indexer.storeResults(txi, addresses, to)
 		if err != nil {
 			log.Fatal().Msgf("can't store indexing results: %v", err)
 		}
 
 		lastBlockIndexed = to
+
+		log.Debug().Str("type", "tx").Int("protocol-id", txi.ID).Int("num-of-addresses", len(addresses)).Uint64("latest-block-indexed", lastBlockIndexed).Send()
 	}
+
+	log.Debug().Str("type", "tx").Int("protocol-id", txi.ID).Msg("indexer caught up")
 }
 
 func (indexer *TxIndexer) blockFetcherPool(startBlock uint64) <-chan []*types.Block {
@@ -106,7 +111,6 @@ func (indexer *TxIndexer) blockFetcherPool(startBlock uint64) <-chan []*types.Bl
 			for {
 				pool <- struct{}{}
 
-				log.Debug().Msg("blockFetcherPool -> producing blocks")
 				to, from := lastBlockIndexed+1, lastBlockIndexed+BATCH_SIZE
 				block, err := indexer.fetchBlocksByRange(to, from)
 				if err != nil {
@@ -124,37 +128,52 @@ func (indexer *TxIndexer) blockFetcherPool(startBlock uint64) <-chan []*types.Bl
 }
 
 func (indexer *TxIndexer) fetchBlocksByRange(from, to uint64) ([]*types.Block, error) {
-	var payload []rpc.BatchElem
-	blocks := make([]interface{}, BATCH_SIZE)
+	var reqs []rpc.BatchElem
+	rawblocks := make([]interface{}, BATCH_SIZE)
 	index := 0
 
 	for i := from; i <= to; i++ {
-		payload = append(payload, rpc.BatchElem{
+		reqs = append(reqs, rpc.BatchElem{
 			Method: "eth_getBlockByNumber",
 			Args:   []interface{}{hexutil.EncodeBig(big.NewInt(int64(i))), true},
-			Result: &blocks[index],
+			Result: &rawblocks[index],
+			// FIXME add error handling for each req
 		})
 		index++
 	}
 
-	// var batchelements []map[string]interface{}
-	// for i, p := range payload {
-	// 	batchelements = append(batchelements, map[string]interface{}{
-	// 		"jsonrpc": "2.0",
-	// 		"id":      i,
-	// 		"method":  p.Method,
-	// 		"params":  p.Args,
-	// 	})
-	// }
-	// stuff, _ := json.Marshal(batchelements)
-	// fmt.Println(string(stuff))
-
-	err := indexer.rpcclient.BatchCall(payload)
+	err := indexer.rpcclient.BatchCall(reqs)
 	if err != nil {
 		return nil, err
 	}
 
-	return nil, nil
+	var blocks []*types.Block
+	for _, rawblock := range rawblocks {
+		// FIXME just map things manually instead of doing this nonsense
+		jsonblock, err := json.Marshal(rawblock)
+		if err != nil {
+			return nil, err
+		}
+
+		var head *types.Header
+		err = json.Unmarshal(jsonblock, &head)
+		if err != nil {
+			return nil, err
+		}
+
+		var body struct {
+			Transactions []*types.Transaction `json:"transactions"`
+		}
+		err = json.Unmarshal(jsonblock, &body)
+		if err != nil {
+			return nil, err
+		}
+
+		block := types.NewBlockWithHeader(head).WithBody(body.Transactions, nil)
+		blocks = append(blocks, block)
+	}
+
+	return blocks, nil
 }
 
 func (indexer *TxIndexer) processBlocks(txi model.TxIndexer, blocks []*types.Block) ([]string, error) {
