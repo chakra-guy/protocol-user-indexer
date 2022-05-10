@@ -17,11 +17,10 @@ import (
 func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout})
 	zerolog.SetGlobalLevel(zerolog.DebugLevel)
-
 	log.Info().Msg("starting worker...")
 	defer log.Info().Msg("ending worker...")
 
-	cfg, err := config.Init()
+	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal().Msgf("can't load config variables: %v", err)
 	}

@@ -24,5 +24,6 @@
 
 # Simple API
 
-- api/<address>/protocols
-- List protocols -> list suggested triggers
+- /api/<address>/protocols
+- /api/protocols
+- /api/protocols/<protocol-id>/addresses

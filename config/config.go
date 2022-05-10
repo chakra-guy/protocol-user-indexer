@@ -16,7 +16,7 @@ type EthereumRPC struct {
 	APIKey string `yaml:"api-key"`
 }
 
-func Init() (*Config, error) {
+func Load() (*Config, error) {
 	var cfg Config
 	err := cleanenv.ReadConfig("config.yml", &cfg)
 	return &cfg, err

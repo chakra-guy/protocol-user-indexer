@@ -81,6 +81,58 @@ func (store Store) GetEventIndexers() ([]model.EventIndexer, error) {
 	return ee, nil
 }
 
+func (store Store) GetProtocols() ([]model.Protocol, error) {
+	q := `
+	SELECT * FROM protocols
+	`
+	rows, err := store.db.Query(q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	pp := make([]model.Protocol, 0)
+
+	for rows.Next() {
+		var p model.Protocol
+		err := rows.Scan(&p.ID, &p.Name)
+		if err != nil {
+			return nil, err
+		}
+		pp = append(pp, p)
+	}
+
+	return pp, nil
+}
+
+func (store Store) GetProtocolsByAddress(address string) ([]model.Protocol, error) {
+	// FIXME user_id is pk and is case sensitive which is why i use ILIKE
+	q := `
+	SELECT p.id, p.name FROM protocols as p
+	JOIN protocol_indexers as pi on p.id = pi.protocol_id
+	JOIN protocol_indexers_users as piu on pi.id = piu.protocol_indexer_id
+	WHERE piu.user_id ILIKE $1
+	`
+	rows, err := store.db.Query(q, address)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	pp := make([]model.Protocol, 0)
+
+	for rows.Next() {
+		var p model.Protocol
+		err := rows.Scan(&p.ID, &p.Name)
+		if err != nil {
+			return nil, err
+		}
+		pp = append(pp, p)
+	}
+
+	return pp, nil
+}
+
 func (store Store) PutProtocolUser(protocolIndexerID int, address string) error {
 	dbtx, err := store.db.BeginTx(context.TODO(), nil)
 	if err != nil {
