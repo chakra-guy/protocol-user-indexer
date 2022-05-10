@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/tamas-soos/wallet-explorer/store"
+	"github.com/tamas-soos/protocol-user-indexer/store"
 )
 
 type Handler struct {

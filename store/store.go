@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/tamas-soos/wallet-explorer/model"
+	"github.com/tamas-soos/protocol-user-indexer/model"
 )
 
 type Store struct {

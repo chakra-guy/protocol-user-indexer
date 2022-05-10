@@ -6,10 +6,10 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/tamas-soos/wallet-explorer/config"
-	"github.com/tamas-soos/wallet-explorer/db"
-	"github.com/tamas-soos/wallet-explorer/server/handlers"
-	"github.com/tamas-soos/wallet-explorer/store"
+	"github.com/tamas-soos/protocol-user-indexer/config"
+	"github.com/tamas-soos/protocol-user-indexer/db"
+	"github.com/tamas-soos/protocol-user-indexer/server/handlers"
+	"github.com/tamas-soos/protocol-user-indexer/store"
 )
 
 func main() {

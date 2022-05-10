@@ -1,4 +1,4 @@
-module github.com/tamas-soos/wallet-explorer
+module github.com/tamas-soos/protocol-user-indexer
 
 go 1.17
 

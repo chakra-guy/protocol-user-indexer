@@ -1,6 +1,10 @@
 # todo
 
--
+- add more indexer specs
+- add tests for indexer
+- make event/tx indexer faster
+  -> fetcher bucket
+  -> fetcher pools
 
 # later
 
@@ -13,17 +17,7 @@
 - db reset/setup/seed
 - rename protocol_indexer table to just indexer?
 - move type field into initial migration
+- refactor -> clean the code just like uncle bob would do it
 
-# Simple Worker
-
-- Fetch indexer specs
-- Loop through indexer specs (per type)
-  - Fetch blocks (per indexer spec)
-  - Index blocks (per indexer spec)
-  - Store users (per indexer spec)
-
-# Simple API
-
-- /api/<address>/protocols
-- /api/protocols
-- /api/protocols/<protocol-id>/addresses
+- terraform
+- cloudwatch

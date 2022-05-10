@@ -7,11 +7,11 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/tamas-soos/wallet-explorer/config"
-	"github.com/tamas-soos/wallet-explorer/db"
-	"github.com/tamas-soos/wallet-explorer/eth"
-	"github.com/tamas-soos/wallet-explorer/indexer"
-	"github.com/tamas-soos/wallet-explorer/store"
+	"github.com/tamas-soos/protocol-user-indexer/config"
+	"github.com/tamas-soos/protocol-user-indexer/db"
+	"github.com/tamas-soos/protocol-user-indexer/eth"
+	"github.com/tamas-soos/protocol-user-indexer/indexer"
+	"github.com/tamas-soos/protocol-user-indexer/store"
 )
 
 func main() {

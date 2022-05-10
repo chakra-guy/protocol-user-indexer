@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"strings"
 	"sync"
@@ -13,8 +14,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/rs/zerolog/log"
-	"github.com/tamas-soos/wallet-explorer/model"
-	"github.com/tamas-soos/wallet-explorer/store"
+	"github.com/tamas-soos/protocol-user-indexer/model"
+	"github.com/tamas-soos/protocol-user-indexer/store"
 )
 
 type EventIndexer struct {
@@ -114,8 +115,12 @@ func (indexer *EventIndexer) processLogs(ei model.EventIndexer, contractABI abi.
 	var addresses []string
 
 	for _, log := range logs {
-		if log.Topics[0] == contractABI.Events[ei.Spec.Condition.Event.Name].ID {
+		if log.Topics[0] == contractABI.Events[ei.Spec.Condition.Event.Name].ID && log.Address.String() == ei.Spec.Condition.Contract.Address {
 			event := make(map[string]interface{})
+
+			fmt.Printf("event name: %s\n", ei.Spec.Condition.Event.Name)
+			fmt.Printf("log: %+v\n", log)
+			fmt.Printf("log data: %+v\n", log.Data)
 
 			err := contractABI.UnpackIntoMap(event, ei.Spec.Condition.Event.Name, log.Data)
 			if err != nil {
