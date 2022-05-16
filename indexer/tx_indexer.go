@@ -21,7 +21,7 @@ type TxIndexer struct {
 	ethclient *ethclient.Client
 	rpcclient *rpc.Client
 
-	// metadata (could be in config?)
+	// FIXME should not be here, but fetch at the start
 	networkID *big.Int
 }
 

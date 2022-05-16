@@ -3,8 +3,8 @@
 - add more indexer specs
 - add tests for indexer
 - make event/tx indexer faster
-  -> fetcher bucket
-  -> fetcher pools
+  -> fetch-buckets
+  -> pre-fetch pools
 
 # later
 
