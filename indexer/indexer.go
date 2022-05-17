@@ -1,3 +1,3 @@
 package indexer
 
-var BATCH_SIZE uint64 = 100
+var BATCH_SIZE uint64 = 10

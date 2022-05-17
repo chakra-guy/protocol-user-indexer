@@ -2,55 +2,31 @@ package indexer
 
 import (
 	"context"
-	"encoding/json"
 	"math/big"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/rs/zerolog/log"
+	"github.com/tamas-soos/protocol-user-indexer/blockchain"
 	"github.com/tamas-soos/protocol-user-indexer/model"
 	"github.com/tamas-soos/protocol-user-indexer/store"
 )
 
-type TxIndexer struct {
-	// deps
-	store     *store.Store
-	ethclient *ethclient.Client
-	rpcclient *rpc.Client
-
-	// FIXME should not be here, but fetch at the start
-	networkID *big.Int
-}
-
-func NewTxIndexer(store *store.Store, ethclient *ethclient.Client, rpcclient *rpc.Client) *TxIndexer {
-	return &TxIndexer{
-		store:     store,
-		ethclient: ethclient,
-		rpcclient: rpcclient,
-	}
-}
-
-func (indexer *TxIndexer) Run() {
-	latestBlock, err := indexer.ethclient.BlockNumber(context.TODO())
+func RunTxIndexers(store *store.Store, blockchain *blockchain.Client) {
+	latestBlock, err := blockchain.BlockNumber(context.TODO())
 	if err != nil {
 		log.Fatal().Msgf("can't get latest block: %v", err)
 	}
 
-	indexer.networkID, err = indexer.ethclient.NetworkID(context.TODO())
+	networkID, err := blockchain.NetworkID(context.TODO())
 	if err != nil {
 		log.Fatal().Msgf("can't get network id: %v", err)
 	}
 
-	txIndexers, err := indexer.store.GetTxIndexers()
+	txIndexers, err := store.GetTxIndexers()
 	if err != nil {
 		log.Fatal().Msgf("can't get tx indexers: %v", err)
 	}
-
-	// FIXME
-	// latestBlock = txIndexers[0].LastBlockIndexed + BATCH_SIZE
 
 	var wg sync.WaitGroup
 	for _, txi := range txIndexers {
@@ -58,167 +34,83 @@ func (indexer *TxIndexer) Run() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			indexer.RunBatchProcessor(txi, latestBlock)
+			index(store, blockchain, txi, networkID, latestBlock)
 		}()
 	}
 
 	wg.Wait()
 }
 
-func (indexer *TxIndexer) RunBatchProcessor(txi model.TxIndexer, latestBlock uint64) {
+func index(
+	store *store.Store,
+	blockchain *blockchain.Client,
+	txi model.TxIndexer,
+	networkID *big.Int,
+	latestBlock uint64) {
 	lastBlockIndexed := txi.LastBlockIndexed
 
-	// blocksCH := indexer.blockFetcherPool(lastBlockIndexed)
-
-	// FIXME fix bug when indexer catches up and uses the wrong last indexed block number -> this can lead to skipping blocks
-	for lastBlockIndexed <= latestBlock {
-		// to := lastBlockIndexed + BATCH_SIZE
-		// blocks := <-blocksCH
-
+	for lastBlockIndexed <= latestBlock-BATCH_SIZE {
 		from, to := lastBlockIndexed+1, lastBlockIndexed+BATCH_SIZE
 
-		blocks, err := indexer.fetchBlocksByRange(from, to)
+		blocks, err := blockchain.BlocksByRange(from, to)
 		if err != nil {
 			log.Fatal().Msgf("can't get block: %v", err)
 		}
 
-		addresses, err := indexer.processBlocks(txi, blocks)
+		addresses, err := process(txi, blocks, networkID)
 		if err != nil {
 			log.Fatal().Msgf("can't process blocks: %v", err)
 		}
 
-		err = indexer.storeResults(txi, addresses, to)
+		for _, address := range addresses {
+			err := store.PutProtocolUser(txi.ID, address)
+			if err != nil {
+				log.Fatal().Msgf("can't store addresses: %v", err)
+			}
+		}
+
+		err = store.UpdateLastBlockIndexedByID(txi.ID, lastBlockIndexed)
 		if err != nil {
-			log.Fatal().Msgf("can't store indexing results: %v", err)
+			log.Fatal().Msgf("can't update last block indexed: %v", err)
 		}
 
 		lastBlockIndexed = to
 
-		log.Debug().Str("type", "tx").Int("protocol-id", txi.ID).Int("num-of-addresses", len(addresses)).Uint64("latest-block-indexed", lastBlockIndexed).Send()
+		log.Debug().
+			Str("type", "tx").
+			Int("protocol-indexer-id", txi.ID).
+			Int("num-of-addresses", len(addresses)).
+			Uint64("latest-block-indexed", lastBlockIndexed).
+			Msg("indexing...")
 	}
 
-	log.Debug().Str("type", "tx").Int("protocol-id", txi.ID).Msg("indexer caught up")
+	log.Debug().
+		Str("type", "tx").
+		Int("protocol-indexer-id", txi.ID).
+		Msg("indexer done")
 }
 
-func (indexer *TxIndexer) blockFetcherPool(startBlock uint64) <-chan []*types.Block {
-	POOL_SIZE := 5
-	lastBlockIndexed := startBlock
-	blocksCH := make(chan []*types.Block, 5)
-	pool := make(chan struct{}, POOL_SIZE)
-
-	for i := 0; i < POOL_SIZE; i++ {
-		go func() {
-			for {
-				pool <- struct{}{}
-
-				to, from := lastBlockIndexed+1, lastBlockIndexed+BATCH_SIZE
-				block, err := indexer.fetchBlocksByRange(to, from)
-				if err != nil {
-					log.Fatal().Msgf("can't get block: %v", err)
-				}
-				lastBlockIndexed = from
-				blocksCH <- block
-
-				<-pool
-			}
-		}()
-	}
-
-	return blocksCH
-}
-
-func (indexer *TxIndexer) fetchBlocksByRange(from, to uint64) ([]*types.Block, error) {
-	var reqs []rpc.BatchElem
-	rawblocks := make([]interface{}, BATCH_SIZE)
-	index := 0
-
-	for i := from; i <= to; i++ {
-		reqs = append(reqs, rpc.BatchElem{
-			Method: "eth_getBlockByNumber",
-			Args:   []interface{}{hexutil.EncodeBig(big.NewInt(int64(i))), true},
-			Result: &rawblocks[index],
-			// FIXME add error handling for each req
-		})
-		index++
-	}
-
-	err := indexer.rpcclient.BatchCall(reqs)
-	if err != nil {
-		return nil, err
-	}
-
-	var blocks []*types.Block
-	for _, rawblock := range rawblocks {
-		// FIXME just map things manually instead of doing this nonsense
-		jsonblock, err := json.Marshal(rawblock)
-		if err != nil {
-			return nil, err
-		}
-
-		var head *types.Header
-		err = json.Unmarshal(jsonblock, &head)
-		if err != nil {
-			return nil, err
-		}
-
-		var body struct {
-			Transactions []*types.Transaction `json:"transactions"`
-		}
-		err = json.Unmarshal(jsonblock, &body)
-		if err != nil {
-			return nil, err
-		}
-
-		block := types.NewBlockWithHeader(head).WithBody(body.Transactions, nil)
-		blocks = append(blocks, block)
-	}
-
-	return blocks, nil
-}
-
-func (indexer *TxIndexer) processBlocks(txi model.TxIndexer, blocks []*types.Block) ([]string, error) {
+func process(
+	txi model.TxIndexer,
+	blocks []*types.Block,
+	networkID *big.Int) ([]string, error) {
 	var addresses []string
 
 	for _, block := range blocks {
 		for _, tx := range block.Transactions() {
-			if tx.To() == nil {
-				continue
-			}
-
-			// check conditions
-			if txi.Spec.Condition.Tx.To == tx.To().String() {
-				var userAddress string
-				// check user
+			// match condition
+			if tx.To() != nil && txi.Spec.Condition.Tx.To == tx.To().String() {
+				// select user
 				if txi.Spec.User.Tx == "from" {
-					msg, err := tx.AsMessage(types.LatestSignerForChainID(indexer.networkID), block.BaseFee())
+					msg, err := tx.AsMessage(types.LatestSignerForChainID(networkID), block.BaseFee())
 					if err != nil {
 						return nil, err
 					}
-
-					userAddress = msg.From().Hex()
-					if userAddress != "" {
-						addresses = append(addresses, userAddress)
-					}
+					addresses = append(addresses, msg.From().Hex())
 				}
 			}
 		}
 	}
 
 	return addresses, nil
-}
-
-func (indexer *TxIndexer) storeResults(txi model.TxIndexer, addresses []string, lastBlockIndexed uint64) error {
-	for _, address := range addresses {
-		err := indexer.store.PutProtocolUser(txi.ID, address)
-		if err != nil {
-			return err
-		}
-	}
-
-	err := indexer.store.UpdateLastBlockIndexedByID(txi.ID, lastBlockIndexed)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
