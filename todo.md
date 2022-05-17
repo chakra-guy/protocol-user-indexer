@@ -5,6 +5,7 @@
 - make event/tx indexer faster
   -> fetch-buckets
   -> pre-fetch pools
+- add retry logic
 
 # later
 

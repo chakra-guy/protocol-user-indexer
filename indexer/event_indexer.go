@@ -35,7 +35,7 @@ func NewEventIndexer(store *store.Store, ethclient *ethclient.Client, rpcclient 
 func (indexer *EventIndexer) Run() {
 	latestBlock, err := indexer.ethclient.BlockNumber(context.TODO())
 	if err != nil {
-		log.Fatal().Msgf("can't get lastest block: %v", err)
+		log.Fatal().Msgf("can't get latest block: %v", err)
 	}
 
 	eventIndexers, err := indexer.store.GetEventIndexers()

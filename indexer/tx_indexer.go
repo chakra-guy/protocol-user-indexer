@@ -36,7 +36,7 @@ func NewTxIndexer(store *store.Store, ethclient *ethclient.Client, rpcclient *rp
 func (indexer *TxIndexer) Run() {
 	latestBlock, err := indexer.ethclient.BlockNumber(context.TODO())
 	if err != nil {
-		log.Fatal().Msgf("can't get lastest block: %v", err)
+		log.Fatal().Msgf("can't get latest block: %v", err)
 	}
 
 	indexer.networkID, err = indexer.ethclient.NetworkID(context.TODO())
