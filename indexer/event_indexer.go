@@ -72,7 +72,7 @@ func batchIndexEvents(store *store.Store, blockchain *blockchain.Client, ei mode
 
 		lastBlockIndexed = to
 
-		log.Debug().Str("type", "event").Int("protocol-id", ei.ID).Int("num-of-users", len(users)).Uint64("latest-block-indexed", lastBlockIndexed).Send()
+		log.Debug().Str("type", "event").Int("protocol-id", ei.ID).Int("num-of-users", len(users)).Uint64("latest-block-indexed", lastBlockIndexed).Msg("indexing...")
 	}
 
 	log.Debug().Str("type", "event").Int("protocol-id", ei.ID).Msg("indexer caught up")
