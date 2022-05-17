@@ -55,7 +55,7 @@ func batchIndexEvents(store *store.Store, blockchain *blockchain.Client, ei mode
 			log.Fatal().Msgf("can't get logs: %v", err)
 		}
 
-		users, err := extractUsersFromEvent(ei, logs, contractABI)
+		users, err := extractUsersFromEvents(ei, logs, contractABI)
 		if err != nil {
 			log.Fatal().Msgf("can't process blocks: %v", err)
 		}
@@ -78,7 +78,7 @@ func batchIndexEvents(store *store.Store, blockchain *blockchain.Client, ei mode
 	log.Debug().Str("type", "event").Int("protocol-id", ei.ID).Msg("indexer caught up")
 }
 
-func extractUsersFromEvent(ei model.EventIndexer, logs []types.Log, contractABI abi.ABI) ([]string, error) {
+func extractUsersFromEvents(ei model.EventIndexer, logs []types.Log, contractABI abi.ABI) ([]string, error) {
 	var users []string
 
 	for _, log := range logs {

@@ -51,7 +51,7 @@ func batchIndexTxs(store *store.Store, blockchain *blockchain.Client, txi model.
 			log.Fatal().Msgf("can't get block: %v", err)
 		}
 
-		users, err := extractUsersFromTx(txi, blocks, networkID)
+		users, err := extractUsersFromTxs(txi, blocks, networkID)
 		if err != nil {
 			log.Fatal().Msgf("can't process blocks: %v", err)
 		}
@@ -74,7 +74,7 @@ func batchIndexTxs(store *store.Store, blockchain *blockchain.Client, txi model.
 	log.Debug().Str("type", "tx").Int("protocol-indexer-id", txi.ID).Msg("indexer done")
 }
 
-func extractUsersFromTx(txi model.TxIndexer, blocks []*types.Block, networkID *big.Int) ([]string, error) {
+func extractUsersFromTxs(txi model.TxIndexer, blocks []*types.Block, networkID *big.Int) ([]string, error) {
 	var users []string
 
 	for _, block := range blocks {
