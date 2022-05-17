@@ -134,7 +134,7 @@ func (store Store) GetProtocolsByAddress(address string) ([]model.Protocol, erro
 }
 
 func (store Store) PutProtocolUser(protocolIndexerID int, address string) error {
-	dbtx, err := store.db.BeginTx(context.TODO(), nil)
+	dbtx, err := store.db.BeginTx(context.Background(), nil)
 	if err != nil {
 		return fmt.Errorf("can't insert protocol user into db: %v", err)
 	}
@@ -164,6 +164,17 @@ func (store Store) PutProtocolUser(protocolIndexerID int, address string) error 
 		return fmt.Errorf("can't insert protocol user into db: %v", err)
 	}
 
+	return nil
+}
+
+// TODO bulk insert instead loop
+func (store Store) PutProtocolUsers(protocolIndexerID int, addresses []string) error {
+	for _, address := range addresses {
+		err := store.PutProtocolUser(protocolIndexerID, address)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

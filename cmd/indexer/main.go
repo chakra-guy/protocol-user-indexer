@@ -26,14 +26,20 @@ func main() {
 
 	db := db.New(&cfg.Database)
 	store := store.New(db)
-	blockchainClient := blockchain.New(&cfg.EthereumRPC)
+	blockchain := blockchain.New(&cfg.EthereumRPC)
 
 	var wg sync.WaitGroup
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		indexer.RunTxIndexers(store, blockchainClient)
+		indexer.RunTxIndexers(store, blockchain)
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		indexer.RunEventIndexer(store, blockchain)
 	}()
 
 	wg.Wait()

@@ -1,9 +1,12 @@
 package blockchain
 
 import (
+	"context"
 	"encoding/json"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -82,5 +85,17 @@ func (client *Client) BlocksByRange(from, to uint64) ([]*types.Block, error) {
 	return blocks, nil
 }
 
-func (client *Client) LogsByRange() {
+func (client *Client) LogsByRange(from, to uint64, address common.Address) ([]types.Log, error) {
+	query := ethereum.FilterQuery{
+		FromBlock: big.NewInt(int64(from)),
+		ToBlock:   big.NewInt(int64(to)),
+		Addresses: []common.Address{address},
+	}
+
+	logs, err := client.FilterLogs(context.Background(), query)
+	if err != nil {
+		return nil, err
+	}
+
+	return logs, nil
 }
