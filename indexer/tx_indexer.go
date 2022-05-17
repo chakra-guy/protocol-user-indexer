@@ -41,12 +41,7 @@ func RunTxIndexers(store *store.Store, blockchain *blockchain.Client) {
 	wg.Wait()
 }
 
-func index(
-	store *store.Store,
-	blockchain *blockchain.Client,
-	txi model.TxIndexer,
-	networkID *big.Int,
-	latestBlock uint64) {
+func index(store *store.Store, blockchain *blockchain.Client, txi model.TxIndexer, networkID *big.Int, latestBlock uint64) {
 	lastBlockIndexed := txi.LastBlockIndexed
 
 	for lastBlockIndexed <= latestBlock-BATCH_SIZE {
@@ -76,24 +71,13 @@ func index(
 
 		lastBlockIndexed = to
 
-		log.Debug().
-			Str("type", "tx").
-			Int("protocol-indexer-id", txi.ID).
-			Int("num-of-addresses", len(addresses)).
-			Uint64("latest-block-indexed", lastBlockIndexed).
-			Msg("indexing...")
+		log.Debug().Str("type", "tx").Int("protocol-indexer-id", txi.ID).Int("num-of-addresses", len(addresses)).Uint64("latest-block-indexed", lastBlockIndexed).Msg("indexing...")
 	}
 
-	log.Debug().
-		Str("type", "tx").
-		Int("protocol-indexer-id", txi.ID).
-		Msg("indexer done")
+	log.Debug().Str("type", "tx").Int("protocol-indexer-id", txi.ID).Msg("indexer done")
 }
 
-func process(
-	txi model.TxIndexer,
-	blocks []*types.Block,
-	networkID *big.Int) ([]string, error) {
+func process(txi model.TxIndexer, blocks []*types.Block, networkID *big.Int) ([]string, error) {
 	var addresses []string
 
 	for _, block := range blocks {
