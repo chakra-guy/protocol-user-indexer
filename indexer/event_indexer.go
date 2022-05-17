@@ -41,7 +41,7 @@ func RunEventIndexer(store *store.Store, blockchain *blockchain.Client) {
 
 func batchIndexEvents(store *store.Store, blockchain *blockchain.Client, ei model.EventIndexer, latestBlock uint64) {
 	lastBlockIndexed := ei.LastBlockIndexed
-
+	contractAddress := common.HexToAddress(ei.Spec.Condition.Contract.Address)
 	contractABI, err := abi.JSON(strings.NewReader(ei.Spec.Condition.Contract.ABI))
 	if err != nil {
 		log.Warn().Int("protocol-id", ei.ID).Msgf("can't parse contract abi: %v", err)
@@ -49,9 +49,8 @@ func batchIndexEvents(store *store.Store, blockchain *blockchain.Client, ei mode
 	}
 
 	for lastBlockIndexed <= latestBlock-BATCH_SIZE {
-		addresses := common.HexToAddress(ei.Spec.Condition.Contract.Address)
 		from, to := lastBlockIndexed+1, lastBlockIndexed+BATCH_SIZE
-		logs, err := blockchain.LogsByRange(from, to, addresses)
+		logs, err := blockchain.LogsByRange(from, to, contractAddress)
 		if err != nil {
 			log.Fatal().Msgf("can't get logs: %v", err)
 		}
