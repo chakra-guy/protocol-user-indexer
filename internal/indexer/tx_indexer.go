@@ -5,13 +5,13 @@ import (
 	"math/big"
 	"sync"
 
-	lo "github.com/samber/lo"
-
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/rs/zerolog/log"
 	"github.com/tamas-soos/protocol-user-indexer/internal/blockchain"
 	"github.com/tamas-soos/protocol-user-indexer/internal/model"
 	"github.com/tamas-soos/protocol-user-indexer/internal/store"
+
+	lo "github.com/samber/lo"
 )
 
 func RunTxIndexers(store *store.Store, blockchain *blockchain.Client) {
@@ -40,14 +40,14 @@ func RunTxIndexers(store *store.Store, blockchain *blockchain.Client) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			runPartion(store, blockchain, partition, networkID, id, latestBlock)
+			runTxIndexerPartitions(store, blockchain, partition, networkID, id, latestBlock)
 		}()
 	}
 
 	wg.Wait()
 }
 
-func runPartion(store *store.Store, blockchain *blockchain.Client, tt []model.TxIndexer, networkID *big.Int, startingBlock, latestBlock uint64) {
+func runTxIndexerPartitions(store *store.Store, blockchain *blockchain.Client, tt []model.TxIndexer, networkID *big.Int, startingBlock, latestBlock uint64) {
 	log.Debug().Str("type", "tx").Uint64("partition-id", startingBlock).Int("num-of-indexers", len(tt)).Msg("running indexer partition...")
 
 	lastBlockIndexed := startingBlock
@@ -60,25 +60,25 @@ func runPartion(store *store.Store, blockchain *blockchain.Client, tt []model.Tx
 			log.Fatal().Msgf("can't get block: %v", err)
 		}
 
-		for _, txi := range tt {
-			users, err := extractUsersFromTxs(txi, blocks, networkID)
+		for _, t := range tt {
+			users, err := extractUsersFromTxs(t, blocks, networkID)
 			if err != nil {
 				log.Fatal().Msgf("can't process blocks: %v", err)
 			}
 
-			err = store.PutProtocolUsers(txi.ID, users)
+			err = store.PutProtocolUsers(t.ID, users)
 			if err != nil {
 				log.Fatal().Msgf("can't store users: %v", err)
 			}
 
-			err = store.UpdateLastBlockIndexedByID(txi.ID, to)
+			err = store.UpdateLastBlockIndexedByID(t.ID, to)
 			if err != nil {
 				log.Fatal().Msgf("can't update last block indexed: %v", err)
 			}
 
 			lastBlockIndexed = to
 
-			log.Debug().Str("type", "tx").Int("protocol-indexer-id", txi.ID).Int("num-of-users", len(users)).Uint64("latest-block-indexed", lastBlockIndexed).Msg("indexing...")
+			log.Debug().Str("type", "tx").Int("protocol-indexer-id", t.ID).Int("num-of-users", len(users)).Uint64("latest-block-indexed", lastBlockIndexed).Msg("indexing...")
 		}
 	}
 
