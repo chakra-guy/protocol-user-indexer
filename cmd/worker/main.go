@@ -6,11 +6,11 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/tamas-soos/protocol-user-indexer/blockchain"
-	"github.com/tamas-soos/protocol-user-indexer/config"
-	"github.com/tamas-soos/protocol-user-indexer/db"
-	"github.com/tamas-soos/protocol-user-indexer/indexer"
-	"github.com/tamas-soos/protocol-user-indexer/store"
+	"github.com/tamas-soos/protocol-user-indexer/internal/blockchain"
+	"github.com/tamas-soos/protocol-user-indexer/internal/config"
+	"github.com/tamas-soos/protocol-user-indexer/internal/db"
+	"github.com/tamas-soos/protocol-user-indexer/internal/indexer"
+	"github.com/tamas-soos/protocol-user-indexer/internal/store"
 )
 
 func main() {

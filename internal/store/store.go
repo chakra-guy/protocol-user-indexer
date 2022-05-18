@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/tamas-soos/protocol-user-indexer/model"
+	"github.com/tamas-soos/protocol-user-indexer/internal/model"
 )
 
 type Store struct {

@@ -7,9 +7,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/rs/zerolog/log"
-	"github.com/tamas-soos/protocol-user-indexer/blockchain"
-	"github.com/tamas-soos/protocol-user-indexer/model"
-	"github.com/tamas-soos/protocol-user-indexer/store"
+	"github.com/tamas-soos/protocol-user-indexer/internal/blockchain"
+	"github.com/tamas-soos/protocol-user-indexer/internal/model"
+	"github.com/tamas-soos/protocol-user-indexer/internal/store"
 )
 
 func RunTxIndexers(store *store.Store, blockchain *blockchain.Client) {

@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/rs/zerolog/log"
-	"github.com/tamas-soos/protocol-user-indexer/config"
+	"github.com/tamas-soos/protocol-user-indexer/internal/config"
 )
 
 type Client struct {

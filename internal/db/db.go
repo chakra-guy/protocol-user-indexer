@@ -5,7 +5,7 @@ import (
 
 	_ "github.com/lib/pq"
 	"github.com/rs/zerolog/log"
-	"github.com/tamas-soos/protocol-user-indexer/config"
+	"github.com/tamas-soos/protocol-user-indexer/internal/config"
 )
 
 func New(cfg *config.Database) *sql.DB {

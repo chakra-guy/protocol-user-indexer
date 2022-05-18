@@ -6,17 +6,17 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/tamas-soos/protocol-user-indexer/config"
-	"github.com/tamas-soos/protocol-user-indexer/db"
-	"github.com/tamas-soos/protocol-user-indexer/server/handlers"
-	"github.com/tamas-soos/protocol-user-indexer/store"
+	"github.com/tamas-soos/protocol-user-indexer/internal/config"
+	"github.com/tamas-soos/protocol-user-indexer/internal/db"
+	"github.com/tamas-soos/protocol-user-indexer/internal/handlers"
+	"github.com/tamas-soos/protocol-user-indexer/internal/store"
 )
 
 func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout})
 	zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	log.Info().Msg("starting server...")
-	defer log.Info().Msg("ending server...")
+	log.Info().Msg("starting api...")
+	defer log.Info().Msg("ending api...")
 
 	cfg, err := config.Load()
 	if err != nil {
