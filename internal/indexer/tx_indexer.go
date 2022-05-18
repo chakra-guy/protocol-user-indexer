@@ -40,9 +40,6 @@ func RunTxIndexers(store *store.Store, blockchain *blockchain.Client) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			log.Debug().Str("type", "tx").Uint64("partition-id", id).Int("num-of-indexers", len(partition)).Msg("running indexer partition...")
-			defer log.Debug().Str("type", "tx").Uint64("partition-id", id).Int("num-of-indexers", len(partition)).Msg("indexer partition done")
-
 			runPartion(store, blockchain, partition, networkID, id, latestBlock)
 		}()
 	}
@@ -51,6 +48,8 @@ func RunTxIndexers(store *store.Store, blockchain *blockchain.Client) {
 }
 
 func runPartion(store *store.Store, blockchain *blockchain.Client, tt []model.TxIndexer, networkID *big.Int, startingBlock, latestBlock uint64) {
+	log.Debug().Str("type", "tx").Uint64("partition-id", startingBlock).Int("num-of-indexers", len(tt)).Msg("running indexer partition...")
+
 	lastBlockIndexed := startingBlock
 
 	for lastBlockIndexed <= latestBlock-BATCH_SIZE {
@@ -81,9 +80,9 @@ func runPartion(store *store.Store, blockchain *blockchain.Client, tt []model.Tx
 
 			log.Debug().Str("type", "tx").Int("protocol-indexer-id", txi.ID).Int("num-of-users", len(users)).Uint64("latest-block-indexed", lastBlockIndexed).Msg("indexing...")
 		}
-
-		log.Debug().Msg("loop over")
 	}
+
+	log.Debug().Str("type", "tx").Uint64("partition-id", startingBlock).Int("num-of-indexers", len(tt)).Msg("indexer partition done")
 }
 
 func extractUsersFromTxs(txi model.TxIndexer, blocks []*types.Block, networkID *big.Int) ([]string, error) {
