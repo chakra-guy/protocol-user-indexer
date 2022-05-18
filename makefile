@@ -1,10 +1,10 @@
 DB_URL=postgres://postgres:postgres@localhost:5432/wallet_indexer?sslmode=disable
 
-run-indexer:
-	go run cmd/indexer/main.go
+run:
+	go run cmd/worker/main.go
 
-run-server:
-	go run cmd/server/main.go
+serve:
+	go run cmd/api/main.go
 
 migrate:
 	migrate -database "$(DB_URL)" -path db/migrations up

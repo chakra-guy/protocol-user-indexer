@@ -1,6 +1,6 @@
 module github.com/tamas-soos/protocol-user-indexer
 
-go 1.17
+go 1.18
 
 require (
 	github.com/ethereum/go-ethereum v1.10.15
@@ -8,6 +8,7 @@ require (
 	github.com/ilyakaznacheev/cleanenv v1.2.6
 	github.com/lib/pq v1.0.0
 	github.com/rs/zerolog v1.26.1
+	github.com/samber/lo v1.21.0
 )
 
 require (
@@ -30,6 +31,7 @@ require (
 	github.com/valyala/fasthttp v1.35.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
+	golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
 	golang.org/x/sys v0.0.0-20220227234510-4e6760a101f9 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect

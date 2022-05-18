@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"sync"
 
+	lo "github.com/samber/lo"
+
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/rs/zerolog/log"
 	"github.com/tamas-soos/protocol-user-indexer/internal/blockchain"
@@ -13,11 +15,6 @@ import (
 )
 
 func RunTxIndexers(store *store.Store, blockchain *blockchain.Client) {
-	txIndexers, err := store.GetTxIndexers()
-	if err != nil {
-		log.Fatal().Msgf("can't get tx indexers: %v", err)
-	}
-
 	networkID, err := blockchain.NetworkID(context.Background())
 	if err != nil {
 		log.Fatal().Msgf("can't get network id: %v", err)
@@ -28,50 +25,65 @@ func RunTxIndexers(store *store.Store, blockchain *blockchain.Client) {
 		log.Fatal().Msgf("can't get latest block: %v", err)
 	}
 
+	txIndexers, err := store.GetTxIndexers()
+	if err != nil {
+		log.Fatal().Msgf("can't get tx indexers: %v", err)
+	}
+
+	partitions := lo.GroupBy(txIndexers, func(t model.TxIndexer) uint64 {
+		return t.LastBlockIndexed
+	})
+
 	var wg sync.WaitGroup
-	for _, txi := range txIndexers {
-		txi := txi
+	for id, partition := range partitions {
+		id, partition := id, partition
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			batchIndexTxs(store, blockchain, txi, networkID, latestBlock)
+			log.Debug().Str("type", "tx").Uint64("partition-id", id).Int("num-of-indexers", len(partition)).Msg("running indexer partition...")
+			defer log.Debug().Str("type", "tx").Uint64("partition-id", id).Int("num-of-indexers", len(partition)).Msg("indexer partition done")
+
+			runPartion(store, blockchain, partition, networkID, id, latestBlock)
 		}()
 	}
 
 	wg.Wait()
 }
 
-func batchIndexTxs(store *store.Store, blockchain *blockchain.Client, txi model.TxIndexer, networkID *big.Int, latestBlock uint64) {
-	lastBlockIndexed := txi.LastBlockIndexed
+func runPartion(store *store.Store, blockchain *blockchain.Client, tt []model.TxIndexer, networkID *big.Int, startingBlock, latestBlock uint64) {
+	lastBlockIndexed := startingBlock
 
 	for lastBlockIndexed <= latestBlock-BATCH_SIZE {
 		from, to := lastBlockIndexed+1, lastBlockIndexed+BATCH_SIZE
+
 		blocks, err := blockchain.BlocksByRange(from, to)
 		if err != nil {
 			log.Fatal().Msgf("can't get block: %v", err)
 		}
 
-		users, err := extractUsersFromTxs(txi, blocks, networkID)
-		if err != nil {
-			log.Fatal().Msgf("can't process blocks: %v", err)
+		for _, txi := range tt {
+			users, err := extractUsersFromTxs(txi, blocks, networkID)
+			if err != nil {
+				log.Fatal().Msgf("can't process blocks: %v", err)
+			}
+
+			err = store.PutProtocolUsers(txi.ID, users)
+			if err != nil {
+				log.Fatal().Msgf("can't store users: %v", err)
+			}
+
+			err = store.UpdateLastBlockIndexedByID(txi.ID, to)
+			if err != nil {
+				log.Fatal().Msgf("can't update last block indexed: %v", err)
+			}
+
+			lastBlockIndexed = to
+
+			log.Debug().Str("type", "tx").Int("protocol-indexer-id", txi.ID).Int("num-of-users", len(users)).Uint64("latest-block-indexed", lastBlockIndexed).Msg("indexing...")
 		}
 
-		err = store.PutProtocolUsers(txi.ID, users)
-		if err != nil {
-			log.Fatal().Msgf("can't store users: %v", err)
-		}
-
-		err = store.UpdateLastBlockIndexedByID(txi.ID, lastBlockIndexed)
-		if err != nil {
-			log.Fatal().Msgf("can't update last block indexed: %v", err)
-		}
-
-		lastBlockIndexed = to
-
-		log.Debug().Str("type", "tx").Int("protocol-indexer-id", txi.ID).Int("num-of-users", len(users)).Uint64("latest-block-indexed", lastBlockIndexed).Msg("indexing...")
+		log.Debug().Msg("loop over")
 	}
-
-	log.Debug().Str("type", "tx").Int("protocol-indexer-id", txi.ID).Msg("indexer done")
 }
 
 func extractUsersFromTxs(txi model.TxIndexer, blocks []*types.Block, networkID *big.Int) ([]string, error) {

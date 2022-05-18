@@ -36,11 +36,11 @@ func main() {
 		indexer.RunTxIndexers(store, blockchain)
 	}()
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		indexer.RunEventIndexer(store, blockchain)
-	}()
+	// wg.Add(1)
+	// go func() {
+	// 	defer wg.Done()
+	// 	indexer.RunEventIndexer(store, blockchain)
+	// }()
 
 	wg.Wait()
 }
