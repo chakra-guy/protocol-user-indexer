@@ -38,7 +38,7 @@ func New(cfg *config.EthereumRPC) *Client {
 
 func (client *Client) BlocksByRange(from, to uint64) ([]*types.Block, error) {
 	var reqs []rpc.BatchElem
-	rawblocks := make([]interface{}, 10)
+	rawblocks := make([]interface{}, 100)
 	index := 0
 
 	for i := from; i <= to; i++ {
