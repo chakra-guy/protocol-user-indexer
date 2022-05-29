@@ -36,10 +36,10 @@ func (f *Fetcher) QueryLogs(address string, from int) (*LogsBatchIterator, error
 	return &LogsBatchIterator{iterator: iterator}, nil
 }
 
-func (tbi *LogsBatchIterator) Next(ll *[]model.Log) (bool, error) {
+func (lbi *LogsBatchIterator) Next(ll *[]model.Log) (bool, error) {
 	for {
 		var l model.Log
-		err := tbi.iterator.Next(&l)
+		err := lbi.iterator.Next(&l)
 		if err == iterator.Done {
 			return true, nil
 		}
@@ -49,7 +49,7 @@ func (tbi *LogsBatchIterator) Next(ll *[]model.Log) (bool, error) {
 
 		*ll = append(*ll, l)
 
-		if tbi.iterator.PageInfo().Remaining() == 0 {
+		if lbi.iterator.PageInfo().Remaining() == 0 {
 			return false, nil
 		}
 	}

@@ -28,7 +28,7 @@ func RunTxIndexers(store *store.Store, fetcher *fetcher.Fetcher) {
 			log.Debug().Str("type", "tx").Int("indexer-id", ti.ID).Int("starting-block", ti.LastBlockIndexed).Msg("running indexer...")
 			start := time.Now()
 
-			runTxIndexer(ti, store, fetcher)
+			indexTxs(ti, store, fetcher)
 
 			took := fmt.Sprintf("%.2f", time.Since(start).Minutes())
 			log.Debug().Str("type", "tx").Int("indexer-id", ti.ID).Str("took-min", took).Msg("indexer caught up")
@@ -38,7 +38,7 @@ func RunTxIndexers(store *store.Store, fetcher *fetcher.Fetcher) {
 	wg.Wait()
 }
 
-func runTxIndexer(ti model.TxIndexer, store *store.Store, fetcher *fetcher.Fetcher) {
+func indexTxs(ti model.TxIndexer, store *store.Store, fetcher *fetcher.Fetcher) {
 
 	batches, err := fetcher.QueryTransactions(ti.Spec.Condition.Tx.To, ti.LastBlockIndexed)
 	if err != nil {

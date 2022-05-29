@@ -31,7 +31,7 @@ func RunEventIndexer(store *store.Store, fetcher *fetcher.Fetcher) {
 			log.Debug().Str("type", "event").Int("indexer-id", ei.ID).Int("starting-block", ei.LastBlockIndexed).Msg("running indexer...")
 			start := time.Now()
 
-			batchIndexEvents(ei, store, fetcher)
+			indexEvents(ei, store, fetcher)
 
 			took := fmt.Sprintf("%.2f", time.Since(start).Minutes())
 			log.Debug().Str("type", "event").Int("protocol-id", ei.ID).Str("took-min", took).Msg("indexer caught up")
@@ -41,7 +41,7 @@ func RunEventIndexer(store *store.Store, fetcher *fetcher.Fetcher) {
 	wg.Wait()
 }
 
-func batchIndexEvents(ei model.EventIndexer, store *store.Store, fetcher *fetcher.Fetcher) {
+func indexEvents(ei model.EventIndexer, store *store.Store, fetcher *fetcher.Fetcher) {
 
 	contractABI, err := abi.JSON(strings.NewReader(ei.Spec.Condition.Contract.ABI))
 	if err != nil {
