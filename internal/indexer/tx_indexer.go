@@ -1,110 +1,80 @@
 package indexer
 
 import (
-	"context"
-	"math/big"
+	"fmt"
 	"sync"
+	"time"
 
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/rs/zerolog/log"
-	"github.com/tamas-soos/protocol-user-indexer/internal/blockchain"
+	"github.com/tamas-soos/protocol-user-indexer/internal/fetcher"
 	"github.com/tamas-soos/protocol-user-indexer/internal/model"
 	"github.com/tamas-soos/protocol-user-indexer/internal/store"
-
-	lo "github.com/samber/lo"
 )
 
-func RunTxIndexers(store *store.Store, blockchain *blockchain.Client) {
-	networkID, err := blockchain.NetworkID(context.Background())
-	if err != nil {
-		log.Fatal().Msgf("can't get network id: %v", err)
-	}
-
-	latestBlock, err := blockchain.BlockNumber(context.Background())
-	if err != nil {
-		log.Fatal().Msgf("can't get latest block: %v", err)
-	}
+func RunTxIndexers(store *store.Store, fetcher *fetcher.Fetcher) {
 
 	txIndexers, err := store.GetTxIndexers()
 	if err != nil {
 		log.Fatal().Msgf("can't get tx indexers: %v", err)
 	}
 
-	partitions := lo.GroupBy(txIndexers, func(t model.TxIndexer) uint64 {
-		return t.LastBlockIndexed
-	})
-
 	var wg sync.WaitGroup
-	for id, partition := range partitions {
-		id, partition := id, partition
+	for _, ti := range txIndexers {
+		ti := ti
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			runTxIndexerPartitions(store, blockchain, partition, networkID, id, latestBlock)
+
+			log.Debug().Str("type", "tx").Int("indexer-id", ti.ID).Int("starting-block", ti.LastBlockIndexed).Msg("running indexer...")
+			start := time.Now()
+
+			runTxIndexer(ti, store, fetcher)
+
+			took := fmt.Sprintf("%.2f", time.Since(start).Minutes())
+			log.Debug().Str("type", "tx").Int("indexer-id", ti.ID).Str("took-min", took).Msg("indexer caught up")
 		}()
 	}
 
 	wg.Wait()
 }
 
-func runTxIndexerPartitions(store *store.Store, blockchain *blockchain.Client, tt []model.TxIndexer, networkID *big.Int, startingBlock, latestBlock uint64) {
-	log.Debug().Str("type", "tx").Uint64("partition-id", startingBlock).Int("num-of-indexers", len(tt)).Msg("running indexer partition...")
+func runTxIndexer(ti model.TxIndexer, store *store.Store, fetcher *fetcher.Fetcher) {
 
-	lastBlockIndexed := startingBlock
+	batches, err := fetcher.QueryTransactions(ti.Spec.Condition.Tx.To, ti.LastBlockIndexed)
+	if err != nil {
+		log.Fatal().Msgf("failed to assemble the query: %v", err)
+	}
 
-	for lastBlockIndexed <= latestBlock-BATCH_SIZE {
-		from, to := lastBlockIndexed+1, lastBlockIndexed+BATCH_SIZE
+	for {
+		start := time.Now()
 
-		blocks, err := blockchain.BlocksByRange(from, to)
+		var tt []model.Transaction
+		done, err := batches.Next(&tt)
 		if err != nil {
-			log.Fatal().Msgf("can't get block: %v", err)
+			log.Fatal().Msgf("can't fetch transactions: %v", err)
+		}
+		if done {
+			break
 		}
 
+		var users []string
 		for _, t := range tt {
-			users, err := extractUsersFromTxs(t, blocks, networkID)
-			if err != nil {
-				log.Fatal().Msgf("can't process blocks: %v", err)
-			}
-
-			err = store.PutProtocolUsers(t.ID, users)
-			if err != nil {
-				log.Fatal().Msgf("can't store users: %v", err)
-			}
-
-			err = store.UpdateLastBlockIndexedByID(t.ID, to)
-			if err != nil {
-				log.Fatal().Msgf("can't update last block indexed: %v", err)
-			}
-
-			lastBlockIndexed = to
-
-			log.Debug().Str("type", "tx").Int("protocol-indexer-id", t.ID).Int("num-of-users", len(users)).Uint64("latest-block-indexed", lastBlockIndexed).Msg("indexing...")
+			users = append(users, t.Sender)
 		}
-	}
 
-	log.Debug().Str("type", "tx").Uint64("partition-id", startingBlock).Int("num-of-indexers", len(tt)).Msg("indexer partition done")
-}
-
-func extractUsersFromTxs(txi model.TxIndexer, blocks []*types.Block, networkID *big.Int) ([]string, error) {
-	var users []string
-
-	for _, block := range blocks {
-		for _, tx := range block.Transactions() {
-			// match condition
-			if tx.To() != nil && txi.Spec.Condition.Tx.To == tx.To().String() {
-				// extract user
-				if txi.Spec.User.Tx == "from" {
-					msg, err := tx.AsMessage(types.LatestSignerForChainID(networkID), block.BaseFee())
-					if err != nil {
-						return nil, err
-					}
-
-					user := msg.From().Hex()
-					users = append(users, user)
-				}
-			}
+		err = store.PutProtocolUsers(ti.ID, users)
+		if err != nil {
+			log.Fatal().Msgf("can't store users: %v", err)
 		}
-	}
 
-	return users, nil
+		lastBlockIndexed := tt[len(tt)-1].BlockNumber
+		err = store.UpdateLastBlockIndexedByID(ti.ID, lastBlockIndexed)
+		if err != nil {
+			log.Fatal().Msgf("can't update last block indexed: %v", err)
+		}
+
+		took := fmt.Sprintf("%.2f", time.Since(start).Seconds())
+
+		log.Debug().Str("type", "tx").Int("indexer-id", ti.ID).Int("num-of-users", len(users)).Int("latest-block-indexed", lastBlockIndexed).Str("took-sec", took).Msg("indexing...")
+	}
 }

@@ -21,8 +21,8 @@ func New(db *sql.DB) *Store {
 
 func (store Store) GetTxIndexers() ([]model.TxIndexer, error) {
 	q := `
-	SELECT id, last_block_indexed, spec FROM protocol_indexers
-	WHERE type = 'tx'
+		SELECT id, last_block_indexed, spec FROM protocol_indexers
+		WHERE type = 'tx'
 	`
 	rows, err := store.db.Query(q)
 	if err != nil {
@@ -52,8 +52,8 @@ func (store Store) GetTxIndexers() ([]model.TxIndexer, error) {
 
 func (store Store) GetEventIndexers() ([]model.EventIndexer, error) {
 	q := `
-	SELECT id, last_block_indexed, spec FROM protocol_indexers
-	WHERE type = 'event'
+		SELECT id, last_block_indexed, spec FROM protocol_indexers
+		WHERE type = 'event'
 	`
 	rows, err := store.db.Query(q)
 	if err != nil {
@@ -83,7 +83,7 @@ func (store Store) GetEventIndexers() ([]model.EventIndexer, error) {
 
 func (store Store) GetProtocols() ([]model.Protocol, error) {
 	q := `
-	SELECT * FROM protocols
+		SELECT * FROM protocols
 	`
 	rows, err := store.db.Query(q)
 	if err != nil {
@@ -108,10 +108,10 @@ func (store Store) GetProtocols() ([]model.Protocol, error) {
 func (store Store) GetProtocolsByAddress(address string) ([]model.Protocol, error) {
 	// FIXME user_id is pk and is case sensitive which is why i use ILIKE
 	q := `
-	SELECT p.id, p.name FROM protocols as p
-	JOIN protocol_indexers as pi on p.id = pi.protocol_id
-	JOIN protocol_indexers_users as piu on pi.id = piu.protocol_indexer_id
-	WHERE piu.user_id ILIKE $1
+		SELECT p.id, p.name FROM protocols as p
+		JOIN protocol_indexers as pi on p.id = pi.protocol_id
+		JOIN protocol_indexers_users as piu on pi.id = piu.protocol_indexer_id
+		WHERE piu.user_id ILIKE $1
 	`
 	rows, err := store.db.Query(q, address)
 	if err != nil {
@@ -141,21 +141,21 @@ func (store Store) PutProtocolUser(protocolIndexerID int, address string) error 
 	defer dbtx.Rollback()
 
 	statement := `
-	INSERT INTO users (address)
-	VALUES ($1)
-	ON CONFLICT (address) DO NOTHING
+		INSERT INTO users (address)
+		VALUES ($1)
+		ON CONFLICT (address) DO NOTHING
 	`
 	_, err = dbtx.Exec(statement, address)
 	if err != nil {
 		return fmt.Errorf("can't insert protocol user into db: %v", err)
 	}
 
-	statement2 := `
-	INSERT INTO protocol_indexers_users (protocol_indexer_id, user_id)
-	VALUES ($1, $2)
-	ON CONFLICT (protocol_indexer_id, user_id) DO NOTHING
+	statement = `
+		INSERT INTO protocol_indexers_users (protocol_indexer_id, user_id)
+		VALUES ($1, $2)
+		ON CONFLICT (protocol_indexer_id, user_id) DO NOTHING
 	`
-	_, err = dbtx.Exec(statement2, protocolIndexerID, address)
+	_, err = dbtx.Exec(statement, protocolIndexerID, address)
 	if err != nil {
 		return fmt.Errorf("can't insert protocol user into db: %v", err)
 	}
@@ -167,7 +167,7 @@ func (store Store) PutProtocolUser(protocolIndexerID int, address string) error 
 	return nil
 }
 
-// TODO bulk insert instead loop
+// TODO bulk insert instead of looping
 func (store Store) PutProtocolUsers(protocolIndexerID int, addresses []string) error {
 	for _, address := range addresses {
 		err := store.PutProtocolUser(protocolIndexerID, address)
@@ -175,14 +175,15 @@ func (store Store) PutProtocolUsers(protocolIndexerID int, addresses []string) e
 			return err
 		}
 	}
+
 	return nil
 }
 
-func (store Store) UpdateLastBlockIndexedByID(protocolIndexerID int, lastBlockIndexed uint64) error {
+func (store Store) UpdateLastBlockIndexedByID(protocolIndexerID int, lastBlockIndexed int) error {
 	statement := `
-	UPDATE protocol_indexers
-	SET last_block_indexed = $2
-	WHERE id = $1
+		UPDATE protocol_indexers
+		SET last_block_indexed = $2
+		WHERE id = $1
 	`
 	_, err := store.db.Exec(statement, protocolIndexerID, lastBlockIndexed)
 	if err != nil {

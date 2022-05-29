@@ -13,3 +13,6 @@
 
 # Env vars
 config.yml
+
+# Secrets
+service-account.json

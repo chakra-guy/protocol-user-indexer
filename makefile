@@ -7,9 +7,9 @@ serve:
 	go run cmd/api/main.go
 
 migrate:
-	migrate -database "$(DB_URL)" -path db/migrations up
+	migrate -database "$(DB_URL)" -path db/internal/migrations up
 
 migrate-new:
-	migrate create -ext sql -dir db/migrations -seq $(name)
+	migrate create -ext sql -dir db/internal/migrations -seq $(name)
 
 .PHONY: run-indexer run-server migrate new-migration

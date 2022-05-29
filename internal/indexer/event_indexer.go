@@ -1,29 +1,24 @@
 package indexer
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/rs/zerolog/log"
-	"github.com/tamas-soos/protocol-user-indexer/internal/blockchain"
+	"github.com/tamas-soos/protocol-user-indexer/internal/fetcher"
 	"github.com/tamas-soos/protocol-user-indexer/internal/model"
 	"github.com/tamas-soos/protocol-user-indexer/internal/store"
 )
 
-func RunEventIndexer(store *store.Store, blockchain *blockchain.Client) {
+func RunEventIndexer(store *store.Store, fetcher *fetcher.Fetcher) {
+
 	eventIndexers, err := store.GetEventIndexers()
 	if err != nil {
 		log.Fatal().Msgf("can't get event indexers: %v", err)
-	}
-
-	latestBlock, err := blockchain.BlockNumber(context.Background())
-	if err != nil {
-		log.Fatal().Msgf("can't get latest block: %v", err)
 	}
 
 	var wg sync.WaitGroup
@@ -32,32 +27,48 @@ func RunEventIndexer(store *store.Store, blockchain *blockchain.Client) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			batchIndexEvents(store, blockchain, ei, latestBlock)
+
+			log.Debug().Str("type", "event").Int("indexer-id", ei.ID).Int("starting-block", ei.LastBlockIndexed).Msg("running indexer...")
+			start := time.Now()
+
+			batchIndexEvents(ei, store, fetcher)
+
+			took := fmt.Sprintf("%.2f", time.Since(start).Minutes())
+			log.Debug().Str("type", "event").Int("protocol-id", ei.ID).Str("took-min", took).Msg("indexer caught up")
 		}()
 	}
 
 	wg.Wait()
 }
 
-func batchIndexEvents(store *store.Store, blockchain *blockchain.Client, ei model.EventIndexer, latestBlock uint64) {
-	lastBlockIndexed := ei.LastBlockIndexed
-	contractAddress := common.HexToAddress(ei.Spec.Condition.Contract.Address)
+func batchIndexEvents(ei model.EventIndexer, store *store.Store, fetcher *fetcher.Fetcher) {
+
 	contractABI, err := abi.JSON(strings.NewReader(ei.Spec.Condition.Contract.ABI))
 	if err != nil {
 		log.Warn().Int("protocol-id", ei.ID).Msgf("can't parse contract abi: %v", err)
 		return
 	}
 
-	for lastBlockIndexed <= latestBlock-BATCH_SIZE {
-		from, to := lastBlockIndexed+1, lastBlockIndexed+BATCH_SIZE
-		logs, err := blockchain.LogsByRange(from, to, contractAddress)
+	batches, err := fetcher.QueryLogs(ei.Spec.Condition.Contract.Address, ei.LastBlockIndexed)
+	if err != nil {
+		log.Fatal().Msgf("failed to assemble the query: %v", err)
+	}
+
+	for {
+		start := time.Now()
+
+		var ll []model.Log
+		done, err := batches.Next(&ll)
 		if err != nil {
-			log.Fatal().Msgf("can't get logs: %v", err)
+			log.Fatal().Msgf("can't fetch logs: %v", err)
+		}
+		if done {
+			break
 		}
 
-		users, err := extractUsersFromEvents(ei, logs, contractABI)
+		users, err := extractUsersFromEvents(ei, ll, contractABI)
 		if err != nil {
-			log.Fatal().Msgf("can't process blocks: %v", err)
+			log.Fatal().Msgf("can't process events: %v", err)
 		}
 
 		err = store.PutProtocolUsers(ei.ID, users)
@@ -65,25 +76,24 @@ func batchIndexEvents(store *store.Store, blockchain *blockchain.Client, ei mode
 			log.Fatal().Msgf("can't store users: %v", err)
 		}
 
+		lastBlockIndexed := ll[len(ll)-1].BlockNumber
 		err = store.UpdateLastBlockIndexedByID(ei.ID, lastBlockIndexed)
 		if err != nil {
 			log.Fatal().Msgf("can't update last block indexed: %v", err)
 		}
 
-		lastBlockIndexed = to
+		took := fmt.Sprintf("%.2f", time.Since(start).Seconds())
 
-		log.Debug().Str("type", "event").Int("protocol-id", ei.ID).Int("num-of-users", len(users)).Uint64("latest-block-indexed", lastBlockIndexed).Msg("indexing...")
+		log.Debug().Str("type", "event").Int("protocol-id", ei.ID).Int("num-of-users", len(users)).Int("latest-block-indexed", lastBlockIndexed).Str("took-sec", took).Msg("indexing...")
 	}
-
-	log.Debug().Str("type", "event").Int("protocol-id", ei.ID).Msg("indexer caught up")
 }
 
-func extractUsersFromEvents(ei model.EventIndexer, logs []types.Log, contractABI abi.ABI) ([]string, error) {
+func extractUsersFromEvents(ei model.EventIndexer, logs []model.Log, contractABI abi.ABI) ([]string, error) {
 	var users []string
 
 	for _, log := range logs {
 		// match condition
-		if log.Topics[0] == contractABI.Events[ei.Spec.Condition.Event.Name].ID && log.Address.String() == ei.Spec.Condition.Contract.Address {
+		if log.Topics[0] == contractABI.Events[ei.Spec.Condition.Event.Name].ID.String() {
 			// extract user
 			event, err := makeEvent(ei.Spec.Condition.Event.Name, contractABI, log)
 			if err != nil {
@@ -100,10 +110,10 @@ func extractUsersFromEvents(ei model.EventIndexer, logs []types.Log, contractABI
 	return users, nil
 }
 
-func makeEvent(name string, contractABI abi.ABI, log types.Log) (map[string]interface{}, error) {
+func makeEvent(name string, contractABI abi.ABI, log model.Log) (map[string]interface{}, error) {
 	event := make(map[string]interface{})
 
-	err := contractABI.UnpackIntoMap(event, name, log.Data)
+	err := contractABI.UnpackIntoMap(event, name, common.FromHex(log.Data))
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +122,7 @@ func makeEvent(name string, contractABI abi.ABI, log types.Log) (map[string]inte
 	for _, input := range contractABI.Events[name].Inputs {
 		if input.Indexed {
 			if input.Type.String() == "address" {
-				event[input.Name] = common.HexToAddress(log.Topics[i].Hex()).String()
+				event[input.Name] = common.HexToAddress(log.Topics[i]).String()
 			} else {
 				// TODO handle more event arg types?
 				event[input.Name] = log.Topics[i]

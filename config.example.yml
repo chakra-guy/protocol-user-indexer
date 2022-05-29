@@ -4,3 +4,10 @@ database:
 ethereum-rpc:
   url:
   api-key:
+
+gcp:
+  project-id:
+  service-account:
+  bigquery:
+    location:
+    dataset:

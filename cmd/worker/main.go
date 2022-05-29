@@ -6,9 +6,9 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/tamas-soos/protocol-user-indexer/internal/blockchain"
 	"github.com/tamas-soos/protocol-user-indexer/internal/config"
 	"github.com/tamas-soos/protocol-user-indexer/internal/db"
+	"github.com/tamas-soos/protocol-user-indexer/internal/fetcher"
 	"github.com/tamas-soos/protocol-user-indexer/internal/indexer"
 	"github.com/tamas-soos/protocol-user-indexer/internal/store"
 )
@@ -26,20 +26,20 @@ func main() {
 
 	db := db.New(&cfg.Database)
 	store := store.New(db)
-	blockchain := blockchain.New(&cfg.EthereumRPC)
+	fetcher := fetcher.New(&cfg.GCP)
 
 	var wg sync.WaitGroup
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		indexer.RunTxIndexers(store, blockchain)
+		indexer.RunTxIndexers(store, fetcher)
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		indexer.RunEventIndexer(store, blockchain)
+		indexer.RunEventIndexer(store, fetcher)
 	}()
 
 	wg.Wait()

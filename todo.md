@@ -1,12 +1,3 @@
-# todo
-
-- add more indexer specs
-- add tests for indexer
-- make event/tx indexer faster
-  -> fetch-buckets
-  -> pre-fetch pools
-- add retry logic
-
 # later
 
 - add protocol indexer id to logs
@@ -18,7 +9,7 @@
 - db reset/setup/seed
 - rename protocol_indexer table to just indexer?
 - move type field into initial migration
-- refactor -> clean the code just like uncle bob would do it
+- refactor -> clean the code just like uncle bob would do it -> lol
 
 - terraform
 - cloudwatch
