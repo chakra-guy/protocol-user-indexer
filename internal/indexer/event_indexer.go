@@ -28,8 +28,8 @@ func RunEventIndexer(store *store.Store, fetcher *fetcher.Fetcher) {
 		go func() {
 			defer wg.Done()
 
-			log.Debug().Str("type", "event").Int("indexer-id", ei.ID).Int("starting-block", ei.LastBlockIndexed).Msg("running indexer...")
 			start := time.Now()
+			log.Debug().Str("type", "event").Int("indexer-id", ei.ID).Int("starting-block", ei.LastBlockIndexed).Msg("running indexer...")
 
 			indexEvents(ei, store, fetcher)
 

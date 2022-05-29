@@ -25,8 +25,8 @@ func RunTxIndexers(store *store.Store, fetcher *fetcher.Fetcher) {
 		go func() {
 			defer wg.Done()
 
-			log.Debug().Str("type", "tx").Int("indexer-id", ti.ID).Int("starting-block", ti.LastBlockIndexed).Msg("running indexer...")
 			start := time.Now()
+			log.Debug().Str("type", "tx").Int("indexer-id", ti.ID).Int("starting-block", ti.LastBlockIndexed).Msg("running indexer...")
 
 			indexTxs(ti, store, fetcher)
 
