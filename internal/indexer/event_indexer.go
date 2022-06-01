@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 	"sync"
@@ -100,8 +101,16 @@ func extractUsersFromEvents(ei model.EventIndexer, logs []model.Log, contractABI
 				return nil, fmt.Errorf("can't make event from log: %v'", err)
 			}
 
-			user, ok := event[ei.Spec.User.Event.Arg].(string)
-			if ok && user != "" {
+			// FIXME normalize address
+			var user string
+			switch str := event[ei.Spec.User.Event.Arg].(type) {
+			case string:
+				user = str
+			case fmt.Stringer:
+				user = str.String()
+			}
+
+			if user != "" {
 				users = append(users, user)
 			}
 		}
@@ -113,16 +122,20 @@ func extractUsersFromEvents(ei model.EventIndexer, logs []model.Log, contractABI
 func makeEvent(name string, contractABI abi.ABI, log model.Log) (map[string]interface{}, error) {
 	event := make(map[string]interface{})
 
-	err := contractABI.UnpackIntoMap(event, name, common.FromHex(log.Data))
-	if err != nil {
-		return nil, err
+	data := common.FromHex(log.Data)
+	if !bytes.Equal(data, nil) {
+		err := contractABI.UnpackIntoMap(event, name, data)
+		if err != nil {
+			return nil, err
+		}
 	}
 
+	// FIXME normalize address
 	var i = 1 // event args starts from index 1
 	for _, input := range contractABI.Events[name].Inputs {
 		if input.Indexed {
 			if input.Type.String() == "address" {
-				event[input.Name] = common.HexToAddress(log.Topics[i]).String()
+				event[input.Name] = common.HexToAddress(log.Topics[i])
 			} else {
 				// TODO handle more event arg types?
 				event[input.Name] = log.Topics[i]
