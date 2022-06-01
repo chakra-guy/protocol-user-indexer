@@ -108,10 +108,11 @@ func (store Store) GetProtocols() ([]model.Protocol, error) {
 func (store Store) GetProtocolsByAddress(address string) ([]model.Protocol, error) {
 	// FIXME user_id is pk and is case sensitive which is why i use ILIKE
 	q := `
-		SELECT p.id, p.name FROM protocols as p
+		SELECT p.name FROM protocols as p
 		JOIN protocol_indexers as pi on p.id = pi.protocol_id
 		JOIN protocol_indexers_users as piu on pi.id = piu.protocol_indexer_id
 		WHERE piu.user_id ILIKE $1
+		GROUP BY p.name
 	`
 	rows, err := store.db.Query(q, address)
 	if err != nil {
@@ -123,7 +124,7 @@ func (store Store) GetProtocolsByAddress(address string) ([]model.Protocol, erro
 
 	for rows.Next() {
 		var p model.Protocol
-		err := rows.Scan(&p.ID, &p.Name)
+		err := rows.Scan(&p.Name)
 		if err != nil {
 			return nil, err
 		}
